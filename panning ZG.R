@@ -27,6 +27,7 @@ d = 5 # number of covariates
 p = 0.5 # propensity score
 M = 100 # number of repetitions
 q = 0.2 # FDR level
+Group.number = 8
 
 m = 100 # number of trials
 record = list()
@@ -41,15 +42,17 @@ for(i in 1:m){
   # generate data
   S = cbind(apply(rmultinom(n, 1, rep(1, 2)), 2, which.max),
             apply(rmultinom(n, 1, rep(1, 4)), 2, which.max)) # S used to define subgroups
-  Group = (S[,1] - 1) * 4 + S[,2]; Group.number = length(unique(Group))
+  Group = (S[,1] - 1) * 4 + S[,2]; 
+  G = model.matrix(~ factor(Group) - 1) # one-hot encoding of Group
+  Group.number = length(unique(Group))
   X = matrix(rnorm(n * d, 0, 1), nrow = n, ncol = d) # covariates
   W = rbinom(n, 1, p) # treatment assignment
   # potential outcomes
   # mu0 is linear in X and S
   # tau is linear in S and independent of X
-  beta0 = 1; beta = rep(1, d); theta = rep(1, 2); delta = 1/3 # 1/3
+  beta0 = 1; beta = rep(1, d); theta = rep(1, 2); delta = 1/2 # 1/3
   Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, 1)
-  tau = delta * (S[,1] - S[, 2]); tau.group = sapply(seq(1, Group.number), function(x){mean(tau[Group == x])}) # average treatment effect in each group
+  tau = delta * (S[,1] > 1) * (S[,2] > 2); tau.group = sapply(seq(1, Group.number), function(x){mean(tau[Group == x])}) # average treatment effect in each group; previously (S[,1] - S[, 2])
   Y1 = Y0 + tau
   Y = Y1 * W + Y0 * (1 - W) # observed outcome
   
@@ -73,11 +76,11 @@ for(i in 1:m){
   
   # SSRT: sample-splitting RT  
   # no further sample splitting
-  data.train = data.frame(Y, X, S, W - 0.5, (W-0.5) * X, (W-0.5) * S)
-  data = data.frame(Y, X, S, 0 - 0.5, (0 - 0.5) * X, (0 - 0.5) * S)
+  data.train = data.frame(Y, X, G, W - 0.5, (W-0.5) * X, (W-0.5) * G)
+  data = data.frame(Y, X, G, 0 - 0.5, (0 - 0.5) * X, (0 - 0.5) * G)
   colnames(data) = colnames(data.train)
   nuisance.index = sample(n, n/2)
-  nuisance.model = lm(Y ~ ., data = data.train[nuisance.index,])
+  nuisance.model = lm(Y ~ -1, data = data.train[nuisance.index,])
   mu0.hat = predict(nuisance.model, newdata = data[-nuisance.index, ])
   
   # nuisance function estimator fixed
@@ -89,7 +92,7 @@ for(i in 1:m){
   for(j in 1 : M){
     W.ref = rbinom(n, 1, p) 
     for (k in 1: Group.number){
-      data.ref = data.frame(Y, X, S, 0 - 0.5, (0 - 0.5) * X, (0 - 0.5) * S)
+      data.ref = data.frame(Y, X, G, 0 - 0.5, (0 - 0.5) * X, (0 - 0.5) * G)
       colnames(data.ref) = colnames(data)
       mu0.hat.ref = predict(nuisance.model, newdata = data.ref[-nuisance.index,])
       T.SSRT.ref[j, k] =  mean((Y[-nuisance.index] - mu0.hat.ref)[(W.ref[-nuisance.index] == 1) & (Group[-nuisance.index] == k)]) - mean((Y[-nuisance.index] - mu0.hat.ref)[(W.ref[-nuisance.index] == 0) & (Group[-nuisance.index] == k)])
@@ -104,9 +107,9 @@ for(i in 1:m){
   # Only use one knockoff copy.
   W.knockoff = rbinom(n, 1, p)
   W.tilde = (W.knockoff + W) / 2
-  data.tilde = data.frame(Y, X, S, W.tilde - 0.5, (W.tilde - 0.5) * X, (W.tilde - 0.5) * S)
+  data.tilde = data.frame(Y, X, G, W.tilde - 0.5, (W.tilde - 0.5) * X, (W.tilde - 0.5) * G)
   colnames(data.tilde) = colnames(data)
-  nuisance.model = lm(Y ~ ., data = data.tilde)
+  nuisance.model = lm(Y ~ -1, data = data.tilde)
   mu0.hat = predict(nuisance.model, data)
   T.ART = rep(0, Group.number)
   for(k in 1: Group.number){
@@ -117,7 +120,7 @@ for(i in 1:m){
     swap.index = which(rbinom(n, 1, 0.5) == 1)
     W.ref = W; W.ref[swap.index] = W.knockoff[swap.index]
     for (k in 1: Group.number){
-      data.ref = data.frame(Y, X, S, 0 - 0.5, (0 - 0.5) * X, (0 - 0.5) * S)
+      data.ref = data.frame(Y, X, G, 0 - 0.5, (0 - 0.5) * X, (0 - 0.5) * G)
       colnames(data.ref) = colnames(data)
       mu0.hat.ref = predict(nuisance.model, newdata = data.ref)
       T.ART.ref[j, k] =  mean((Y - mu0.hat.ref)[(W.ref == 1) & (Group == k)]) -  mean((Y - mu0.hat.ref)[(W.ref == 0) & (Group == k)])
