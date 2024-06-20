@@ -1,2 +1,2 @@
 # Panning
- Codes for using FRT to conduct inference for heterogeneous treatment effects
+ Codes for using FRT to conduct inference for heterogeneous treatment effects.
