@@ -99,6 +99,8 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", mu0.hat = NUL
   }else if (stats == "denoise + ATE") {
     # Negative absolute difference between the difference in means with denoising using mu.hat and the estimated ATE
     value = -abs(sum(W * (Y - mu.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu.hat)) / max(1, sum(1 - W)) - mean(tau.hat))
+  }else if(stats == "AIPW"){
+    value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
     value = -mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))

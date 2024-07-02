@@ -8,31 +8,19 @@ p = 0.5 # propensity score
 Group.level.number = c(3, 3) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta = rep(1, d) * 1; theta = rep(1, 2)
-delta = 1
+delta = 1 # 1
 sigma = 1 # error magnitude in generating Y(0)
 
-test.stats.method = "denoise" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE"; test statistic
+test.stats.method = "ATE" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE"; test statistic
 B = 3 # number of knockoffs
 M = 400 # number of permutations
 q = 0.2 # FDR level
 
 # setting
-setting = "AIPW" # "default", "large sample", "few groups", "many groups", "strong baseline", "ATE", "denoise + ATE", "ITE", "B4", "B1"
-if(setting == "large sample"){n = 800}
-if(setting == "few groups"){Group.level.number = c(2, 2); Group.number = prod(Group.level.number)}
-if(setting == "many groups"){Group.level.number = c(4, 4); Group.number = prod(Group.level.number)}
-if(setting == "strong baseline"){beta = rep(1, d) * 2}
-# if(setting == "no treatment effect"){delta = 0}
-if(setting == "strong treatment effect"){delta = 2}
-if(setting == "ATE"){test.stats.method = "ATE"}
-if(setting == "denoise + ATE"){test.stats.method = "denoise + ATE"}
-if(setting == "ITE"){test.stats.method = "ITE"}
-if(setting == "AIPW"){test.stats.method = "AIPW"}
-if(setting == "B4"){B = 4}
-if(setting == "B1"){B = 1}
+setting = "default" # "default"
 
 start.time = proc.time()
-m = 40 # number of trials
+m = 400 # number of trials
 record = list()
 record$pValue = list()
 record$pValue$ORT = record$pValue$RT = record$pValue$SSRT = record$pValue$DDRT = record$pValue$ART = matrix(0, nrow = m, ncol = Group.number) # ORT: oracle RT; RT (baseline): standard RT; SSRT: sample-splitting RT; DDRT: double-dipping RT; ART: augmented RT; 
@@ -53,7 +41,7 @@ for(i in 1:m){
   # mu0 is linear in X and S
   Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
   # tau is linear in S and independent of X
-  tau = delta * (S[, 1] >= Group.level.number[1]) * (S[, 2] >= Group.level.number[2]) #  (S[, 1] >= 3) * (S[, 2] >= 3)
+  tau = delta * (S[, 1] >= Group.level.number[1]) * (S[, 2] >= Group.level.number[2]) * (1 + X[, 1]) # delta * (S[, 1] >= Group.level.number[1]) * (S[, 2] >= Group.level.number[2])
   tau.group = sapply(seq(1, Group.number), function(x) {
     mean(tau[Group == x])
   }) # average treatment effect in each group.
@@ -102,8 +90,8 @@ for(i in 1:m){
 record$setting = setting
 result = rbind(lapply(record$FDP, mean),
                lapply(record$FDP, sd),
-      lapply(record$power, mean),
-      lapply(record$power, sd))
+               lapply(record$power, mean),
+               lapply(record$power, sd))
 row.names(result) = c("FDR", "FDR sd", "power", "power sd")
 print(result)
 end.time = proc.time()
