@@ -17,11 +17,10 @@ B.seq = seq(1, 10) # number of knockoffs: seq(1, 10); c(1, 4, 10)
 M = 400 # number of permutations
 q = 0.2 # FDR level
 
-setting = "ITE" # "default", "small sample", "large sample"
 
-if(setting == "large sample"){n = 800}
-if(setting == "small sample"){n = 200}
-if(setting == "ITE"){test.stats.method = "ITE"} # TODO
+setting = "NumberKnockoffDenoise" # "NumberKnockoffDenoise" (default), "NumberKnockoffITE"
+
+if(setting == "NumberKnockoffITE"){test.stats.method = "ITE"} 
 
 start.time = proc.time()
 m = 400 # number of trials
@@ -87,32 +86,5 @@ print(result)
 end.time = proc.time()
 print(end.time[3] - start.time[3])
 
-# saveRDS(record, file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/0630", paste("NumberKnockoff", setting, ".rds", sep= "")))
+# saveRDS(record, file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/0630", paste(setting, ".rds", sep= "")))
 
-
-path = "~/Desktop/Research/Yao/HTE inference/code/Panning/0630"
-plotDirectory = file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/0630")
-setting.seq = c("NumberKnockoffDenoise", "NumberKnockoffITE")
-library(ggplot2)
-
-
-for(setting in setting.seq){
-   record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
-  
-  plot.data = data.frame(
-    B = B.seq,
-    FDR = apply(record$FDP$ART, 2, mean),
-    power =  apply(record$power$ART, 2, mean)
-  )
-  # pdf(file = paste(plotDirectory, "/", setting, ".pdf", sep = ""), width = 3.5, height = 14)
-  
-  ggplot(plot.data, aes(x = B, y = power)) +
-    geom_line(color = "blue") +  # Plot the curve
-    geom_hline(yintercept = mean(record$power$ORT), linetype = "dashed", color = "red") +  # Add horizontal reference line
-    labs(title = "Power ",
-         x = "Number of knockoffs",
-         y = "Power") +
-    theme_minimal()
-  
-  # dev.off()
-}
