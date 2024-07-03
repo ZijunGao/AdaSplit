@@ -1,13 +1,13 @@
 # plot for number of knockoffs
 path = "~/Desktop/Research/Yao/HTE inference/code/Panning/0630"
 plotDirectory = file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/0630")
-setting.seq = c("NumberKnockoffDenoise", "NumberKnockoffITE")
+setting.seq = c("NumberKnockoff")
 
 library(ggplot2)
 
 
-setting.seq = c("NumberKnockoffDenoise", "NumberKnockoffITE")
-B.seq = seq(1, 10)
+setting.seq = c("NumberKnockoff")
+B.seq = c(seq(1, 4), seq(5, 40, by = 5))
 for(setting in setting.seq){
   record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
   
@@ -24,7 +24,8 @@ for(setting in setting.seq){
     labs(title = "Power ",
          x = "Number of knockoffs",
          y = "Power") +
-    theme_minimal()
+    ylim(0, 0.6) + 
+    theme_minimal() 
   
   dev.off()
 }
