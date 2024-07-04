@@ -4,7 +4,7 @@ plotDirectory = file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/063
 
 setting = "NumberSubgroup"
 record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
-record.2 = readRDS(file.path(path, paste("AIPW + ITE", "rds", sep = ".")))
+# record.2 = readRDS(file.path(path, paste("AIPW + ITE", "rds", sep = ".")))
 Group.level.number = c(2, 4) # number of levels per group
 Group.level.number2.seq = seq(4, 8)
 Group.number.seq = Group.level.number[1] * Group.level.number2.seq 
@@ -22,12 +22,12 @@ plot.data <- data.frame(
   ART_power = apply(record$power$ART, 2, mean)
 )
 
-plot.data$RT_FDR[5] = mean(record.2$FDP$RT)
-plot.data$SSRT_FDR[5] = mean(record.2$FDP$SSRT)
-plot.data$ART_FDR[5] = mean(record.2$FDP$ART)
-plot.data$RT_power[5] = mean(record.2$power$RT)
-plot.data$SSRT_power[5] = mean(record.2$power$SSRT)
-plot.data$ART_power[5] = mean(record.2$power$ART)
+# plot.data$RT_FDR[5] = mean(record.2$FDP$RT)
+# plot.data$SSRT_FDR[5] = mean(record.2$FDP$SSRT)
+# plot.data$ART_FDR[5] = mean(record.2$FDP$ART)
+# plot.data$RT_power[5] = mean(record.2$power$RT)
+# plot.data$SSRT_power[5] = mean(record.2$power$SSRT)
+# plot.data$ART_power[5] = mean(record.2$power$ART)
 
 line.width = 1; point.size = 2
 pdf(file = paste(plotDirectory, "/", setting, "FDR", ".pdf", sep = ""), width = 3.5, height = 3.5)
