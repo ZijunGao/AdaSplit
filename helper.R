@@ -89,7 +89,7 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     # Absolute value of the plain difference in means
     # value = abs(sum(W * Y) / max(1, sum(W)) - sum((1 - W) * Y) / max(1, sum(1 - W)))
     n = length(Y)
-    value = abs(sum(W * Y) / (n * p) - sum((1 - W) * Y) / (n * (1 - p)))
+    value = abs(sum(W * Y) / (n * prop) - sum((1 - W) * Y) / (n * (1 - prop)))
   }else if (stats == "denoise") {
     # Absolute value of the difference in means with denoising using mu.hat
     value = abs(sum(W * (Y - mu.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu.hat)) / max(1, sum(1 - W)))
@@ -114,7 +114,7 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     value1  = abs(sum(W * (Y - mu1.hat)) / (n * prop) - sum((1 - W) * (Y - mu0.hat)) / (n * (1 - prop)) + mean(tau.hat)) / sqrt(1 / (n * prop) + 1 / (n * (1 - prop)))
     # value2 = - mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
     value2 = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
-    value = value1 + value2  # TODO: weights
+    value = value1 + value2 
   }
   
   # Return the computed statistic value
