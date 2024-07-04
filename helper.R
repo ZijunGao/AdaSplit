@@ -84,11 +84,12 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
 #   test.stats(Y, W, X = X, G = G, "ATE", tau.hat)
 #   test.stats(Y, W, X = X, G = G, "denoise + ATE", mu.hat, tau.hat)
 #   test.stats(Y, sample(W), X = X, G = G, "ITE", mu0.hat, mu1.hat)
-test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", mu0.hat = NULL, mu1.hat = NULL, mu.hat = NULL, tau.hat = NULL) {
+test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, mu0.hat = NULL, mu1.hat = NULL, mu.hat = NULL, tau.hat = NULL) {
   if (stats == "plain") {
     # Absolute value of the plain difference in means
-    value = abs(sum(W * Y) / max(1, sum(W)) - sum((1 - W) * Y) / max(1, sum(1 - W)))
-    
+    # value = abs(sum(W * Y) / max(1, sum(W)) - sum((1 - W) * Y) / max(1, sum(1 - W)))
+    n = length(Y)
+    value = abs(sum(W * Y) / (n * p) - sum((1 - W) * Y) / (n * (1 - p)))
   }else if (stats == "denoise") {
     # Absolute value of the difference in means with denoising using mu.hat
     value = abs(sum(W * (Y - mu.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu.hat)) / max(1, sum(1 - W)))
@@ -100,13 +101,19 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", mu0.hat = NUL
     # Negative absolute difference between the difference in means with denoising using mu.hat and the estimated ATE
     value = -abs(sum(W * (Y - mu.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu.hat)) / max(1, sum(1 - W)) - mean(tau.hat))
   }else if(stats == "AIPW"){
-    value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
+    # value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
+    n = length(Y)
+    value1  = abs(sum(W * (Y - mu1.hat)) / (n * prop) - sum((1 - W) * (Y - mu0.hat)) / (n * (1 - prop)) + mean(tau.hat)) / sqrt(1 / (n * prop) + 1 / (n * (1 - prop)))
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
-    value = -mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
+    # value = -mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
+    value = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
   }else if(stats == "AIPW + ITE"){
-    value1  = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat)) / sqrt(min(1, sum(W)) / max(1, sum(W)) +  min(1, sum(W)) / max(1, sum(1 - W)))
-    value2 = - mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
+    # value1  = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat)) / sqrt(min(1, sum(W)) / max(1, sum(W)) +  min(1, sum(W)) / max(1, sum(1 - W)))
+    n = length(Y)
+    value1  = abs(sum(W * (Y - mu1.hat)) / (n * prop) - sum((1 - W) * (Y - mu0.hat)) / (n * (1 - prop)) + mean(tau.hat)) / sqrt(1 / (n * prop) + 1 / (n * (1 - prop)))
+    # value2 = - mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
+    value2 = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
     value = value1 + value2  # TODO: weights
   }
   
@@ -118,14 +125,14 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", mu0.hat = NUL
 # Example:
   # set.seed(318)
   # test.stats.group(Y, sample(W), X, G, Group, mu0.hat = Y0, mu1.hat = Y1, mu.hat = (Y0 + Y1)/2, tau.hat = Y1 - Y0,  stats = "ITE")
-test.stats.group = function(Y, W, X = NULL, G = NULL, Group, stats = "denoise", mu0.hat = NULL, mu1.hat = NULL, mu.hat = NULL, tau.hat = NULL) {
+test.stats.group = function(Y, W, X = NULL, G = NULL, Group, stats = "denoise", prop = NULL, mu0.hat = NULL, mu1.hat = NULL, mu.hat = NULL, tau.hat = NULL) {
   # Get the unique levels of the grouping variable
   Group.level = sort(unique(Group))
   
   # Compute the test statistic value for each group level
   values = sapply(Group.level, function(x) {
     index = which(Group == x)
-    test.stats(Y = Y[index], W = W[index], X = X[index,], G = G[index,], stats = stats, mu0.hat = mu0.hat[index], mu1.hat = mu1.hat[index], mu.hat = mu.hat[index], tau.hat = tau.hat[index])
+    test.stats(Y = Y[index], W = W[index], X = X[index,], G = G[index,], stats = stats, prop = prop, mu0.hat = mu0.hat[index], mu1.hat = mu1.hat[index], mu.hat = mu.hat[index], tau.hat = tau.hat[index])
   })
   
   # Return the computed values for each group level
@@ -146,10 +153,10 @@ ORT = function(Y, X, G, Group, prop = NULL, mu0, mu1, mu, tau, test.stats.method
   n = length(Y)
   
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, mu0.hat = mu0, mu1.hat = mu1, mu.hat = mu, tau.hat = tau)
+  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = prop, mu0.hat = mu0, mu1.hat = mu1, mu.hat = mu, tau.hat = tau)
   
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = test.stats.method, mu0.hat = mu0, mu1.hat = mu1, mu.hat = mu, tau.hat = tau))) #   Each column represents a group
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = test.stats.method, prop = prop, mu0.hat = mu0, mu1.hat = mu1, mu.hat = mu, tau.hat = tau))) #   Each column represents a group
   
   # Calculate p-values for each group
   pval = sapply(seq(1, length(test.stats.value)), function(x) {
@@ -173,10 +180,10 @@ RT = function(Y, X, G, Group, prop = NULL, treatment.assignment = "Bernoulli", M
   n = length(Y)
 
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = "plain")
+  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = "plain", prop = prop)
   
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = "plain"))) #  Each column represents a group
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = "plain", prop = prop))) #  Each column represents a group
   
   # Calculate p-values for each group
   pval = sapply(seq(1, length(test.stats.value)), function(x) {
@@ -203,10 +210,10 @@ DD = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", t
   nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W, method = nuisance.learner.method, train.index = seq(1, n), test.index = seq(1, n)) 
   
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
+  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
 
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #  Each column represents a group 
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #  Each column represents a group 
 
   # Calculate p-values for each group
   pval = sapply(seq(1, length(test.stats.value)), function(x) {
@@ -237,10 +244,10 @@ SS = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", t
   nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W, method = nuisance.learner.method, train.index = train.index, test.index = test.index)
   
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y[test.index], W = W[test.index], X = X[test.index,], Group = Group[test.index], G = G[test.index,], stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
+  test.stats.value = test.stats.group(Y = Y[test.index], W = W[test.index], X = X[test.index,], Group = Group[test.index], G = G[test.index,], stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
   
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y[test.index], W = rbinom(length(test.index), 1, prop), X = X[test.index,], G = G[test.index,], Group = Group[test.index], stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y[test.index], W = rbinom(length(test.index), 1, prop), X = X[test.index,], G = G[test.index,], Group = Group[test.index], stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
 
   # Calculate p-values for each group
   pval = sapply(seq(1, length(test.stats.value)), function(x) {
@@ -270,10 +277,10 @@ DD = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", t
   # nuisance.hat = list(); nuisance.hat$mu0.hat = Y0 * (1 - W);  nuisance.hat$mu1.hat = Y1 * W;  nuisance.hat$tau.hat = nuisance.hat$mu1.hat - nuisance.hat$mu0.hat; nuisance.hat$mu.hat = (nuisance.hat$mu1.hat - nuisance.hat$mu0.hat)/2; 
   
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
+  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
   
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = rbinom(n, 1, prop), X = X, G = G, Group = Group, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
 
   # Calculate p-values for each group
   pval = sapply(seq(1, length(test.stats.value)), function(x) {
@@ -302,10 +309,10 @@ ART = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", 
   nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W.tilde, method = nuisance.learner.method, train.index = seq(1, n), test.index = seq(1, n))
   
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
+  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
   
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = W.aug[cbind(seq(1, n), replicate(n, sample(1 + B, 1)))], X = X, G = G, Group = Group, stats = test.stats.method, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = W.aug[cbind(seq(1, n), replicate(n, sample(1 + B, 1)))], X = X, G = G, Group = Group, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
 
     # Calculate p-values for each group
     pval = sapply(seq(1, length(test.stats.value)), function(x) {
