@@ -3,24 +3,24 @@
 rm(list = ls())
 source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper.R")
 
-n = 400 # sample size
+n = 800 # sample size
 d = 5 # number of covariates
 p = 0.5 # propensity score
-Group.level.number = c(4, 4) # number of levels per group
+Group.level.number = c(4, 5) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta = rep(1, d) * 1; theta = rep(1, 2)
-delta.seq = c(c(0.5, 1, 1.5, 2, 3), 5, 10, 15) # effect size
+delta.seq = c(0.5, 1, 1.5, 2, 2.5) # effect size
 sigma = 1 # error magnitude in generating Y(0)
 
 test.stats.method = "AIPW + ITE" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE"; test statistic
 B = 5 # number of knockoffs: seq(1, 10); c(1, 5, 10)
-M = 400 # number of permutations
+M = 100 # number of permutations
 q = 0.2 # FDR level
 
 setting = "EffectSize"
 
 start.time = proc.time()
-m = 400 # number of trials
+m = 100 # number of trials
 record = list()
 record$pValue = list()
 record$pValue$ORT = record$pValue$RT = record$pValue$SSRT = record$pValue$DDRT = record$pValue$ART = array(0, dim = c(m, Group.number, length(delta.seq))) # ORT: oracle RT; RT (baseline): standard RT; SSRT: sample-splitting RT; DDRT: double-dipping RT; ART: augmented RT; 
@@ -37,13 +37,13 @@ for(j in 1 : length(delta.seq)){
               apply(rmultinom(n, 1, rep(1, Group.level.number[2])), 2, which.max)) # S used to define subgroups
     Group = (S[, 1] - 1) * Group.level.number[2] + S[, 2]; 
     G = model.matrix(~ factor(Group))[, -1] # one-hot encoding of group membership
-    X = matrix(rnorm(n * d, 0, 1), nrow = n, ncol = d) # covariates
+    X = matrix(rnorm(n * d, 0, 0.25), nrow = n, ncol = d) # covariates
     W = rbinom(n, 1, p) # treatment assignment
     # potential outcomes
     # mu0 is linear in X and S
     Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
     # tau is linear in S and independent of X
-    tau = delta * (S[, 1] >= Group.level.number[1]) * (S[, 2] >= (Group.level.number[2] - 1)) * ((setting != "HTE") + (setting == "HTE") * X[, 1]) #  (S[, 1] >= 3) * (S[, 2] >= 3)
+    tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) * ((setting != "HTE") + (setting == "HTE") * X[, 1]) #  (S[, 1] >= 3) * (S[, 2] >= 3)
     tau.group = sapply(seq(1, Group.number), function(x) {
       mean(tau[Group == x])
     }) # average treatment effect in each group.
