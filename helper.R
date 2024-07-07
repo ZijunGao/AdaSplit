@@ -1,4 +1,5 @@
 # helper functions for panning
+library("xgboost")
 
 # BH
 BH.threshold = function(pval, q = 0.1){
@@ -24,52 +25,31 @@ permutation.p.value = function(stats, stats.ref){
 
 # nuisance learner
 nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...){
-  # TODO: other nuisance estimation method
   n = length(Y)
   data.train = data.frame(Y, X, G, W - prop, (W-prop) * X, (W-prop) * G)
   data.0 = data.frame(Y, X, G, 0 - prop, (0 - prop) * X, (0 - prop) * G); colnames(data.0) = colnames(data.train)
   data.1 = data.frame(Y, X, G, 1 - prop, (1 - prop) * X, (1 - prop) * G); colnames(data.1) = colnames(data.train)
-  nuisance.model = lm(Y ~ ., data = data.train[train.index,])
-  mu0.hat = predict(nuisance.model, newdata = data.0[test.index, ])
-  mu1.hat = predict(nuisance.model, newdata = data.1[test.index, ])
+  if(method == "linear"){
+    nuisance.model = lm(Y ~ ., data = data.train[train.index,])
+    mu0.hat = predict(nuisance.model, newdata = data.0[test.index, ])
+    mu1.hat = predict(nuisance.model, newdata = data.1[test.index, ])
+  }else if(method == "gradient boosting"){
+    # Convert data to xgboost DMatrix
+    dtrain = xgb.DMatrix(data = as.matrix(data.train[train.index, -1]), label = data.train$Y[train.index])
+    dtest.0 = xgb.DMatrix(data = as.matrix(data.0[test.index, -1]))
+    dtest.1 = xgb.DMatrix(data = as.matrix(data.1[test.index, -1]))
+    # Fit an xgboost model to the training data
+    params = list(objective = "reg:squarederror", ...)
+    nuisance.model = xgboost(params = params, data = dtrain, nrounds = 100, verbose = 0)
+    # Predict outcomes for W = 0 and W = 1 using the fitted model
+    mu0.hat = predict(nuisance.model, newdata = dtest.0)
+    mu1.hat = predict(nuisance.model, newdata = dtest.1)
+  }
+  
   mu.hat = mu0.hat * (1 - prop) + mu1.hat * prop
   tau.hat = mu1.hat -  mu0.hat
   return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat)) 
 }
-
-nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...) {
-  # TODO: other nuisance estimation method
-  
-  # Get the number of observations
-  n = length(Y)
-  
-  # Prepare training data
-  data.train = data.frame(Y, X, G, W - prop, (W - prop) * X, (W - prop) * G)
-  
-  # Prepare test data for W = 0 and W = 1; the same structure as training data
-  data.0 = data.frame(Y, X, G, 0 - prop, (0 - prop) * X, (0 - prop) * G)
-  colnames(data.0) = colnames(data.train)  # Ensure column names match
-  
-  data.1 = data.frame(Y, X, G, 1 - prop, (1 - prop) * X, (1 - prop) * G)
-  colnames(data.1) = colnames(data.train)  # Ensure column names match
-  
-  # Fit a linear model to the training data
-  nuisance.model = lm(Y ~ ., data = data.train[train.index, ])
-  
-  # Predict outcomes for W = 0 and W = 1 using the fitted model
-  mu0.hat = predict(nuisance.model, newdata = data.0[test.index, ])
-  mu1.hat = predict(nuisance.model, newdata = data.1[test.index, ])
-  
-  # Compute the predicted marginal mean function
-  mu.hat = mu0.hat * (1 - prop) + mu1.hat * prop
-  
-  # Compute the treatment effect estimate
-  tau.hat = mu1.hat - mu0.hat
-  
-  # Return a list of estimated nuisance functions
-  return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat))
-}
-
 
 
 # test statistics: reject large test statistic
@@ -103,7 +83,7 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
   }else if(stats == "AIPW"){
     # value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
     n = length(Y)
-    value1  = abs(sum(W * (Y - mu1.hat)) / (n * prop) - sum((1 - W) * (Y - mu0.hat)) / (n * (1 - prop)) + mean(tau.hat)) / sqrt(1 / (n * prop) + 1 / (n * (1 - prop)))
+    value  = abs(sum(W * (Y - mu1.hat)) / (n * prop) - sum((1 - W) * (Y - mu0.hat)) / (n * (1 - prop)) + mean(tau.hat))
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
     # value = -mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))

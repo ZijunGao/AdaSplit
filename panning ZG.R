@@ -11,27 +11,29 @@ beta0 = 1; beta = rep(1, d) * 1; theta = rep(1, 2)
 delta = 1
 sigma = 1 # error magnitude in generating Y(0)
 
-test.stats.method = "denoise" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE", "AIPW + ITE"; test statistic
+test.stats.method = "AIPW + ITE" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE", "AIPW + ITE"; test statistic
 B = 5 # number of knockoffs
 M = 400 # number of permutations
 q = 0.2 # FDR level
+nuisance.learner.method = "linear" # "linear", "gradient boosting" 
 
 # setting
-setting = "AIPW + ITE" # "default", "large sample", "few groups", "many groups", "strong baseline", "ATE", "denoise + ATE", "ITE", "AIPW + ITE", "B4", "B1", "HTE"
+setting = "gradient boosting" # "default", "large sample", "few groups", "many groups", "strong baseline", "ATE", "denoise + ATE", "ITE", "AIPW + ITE", "B4", "B1", "HTE"
 if(setting == "large sample"){n = 800}
 if(setting == "few groups"){Group.level.number = c(2, 2); Group.number = prod(Group.level.number)}
 if(setting == "many groups"){Group.level.number = c(4, 4); Group.number = prod(Group.level.number)}
 if(setting == "strong baseline"){beta = rep(1, d) * 2}
 # if(setting == "no treatment effect"){delta = 0}
 if(setting == "strong treatment effect"){delta = 2}
+if(setting == "denoise"){test.stats.method = "denoise"}
 if(setting == "ATE"){test.stats.method = "ATE"}
 if(setting == "denoise + ATE"){test.stats.method = "denoise + ATE"}
 if(setting == "ITE"){test.stats.method = "ITE"}
 if(setting == "AIPW"){test.stats.method = "AIPW"}
-if(setting == "AIPW + ITE"){test.stats.method = "AIPW + ITE"}
 if(setting == "HTE"){test.stats.method = "ITE"}
 if(setting == "B4"){B = 4}
 if(setting == "B1"){B = 1}
+if(setting == "gradient boosting"){nuisance.learner.method = "gradient boosting"}
 
 start.time = proc.time()
 m = 400 # number of trials
@@ -55,7 +57,7 @@ for(i in 1:m){
   # mu0 is linear in X and S
   Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
   # tau is linear in S and independent of X
-  tau = delta * (S[, 1] >= Group.level.number[1]) * (S[, 2] >= (Group.level.number[2] - 1)) * ((setting != "HTE") + (setting == "HTE") * X[, 1]) #  (S[, 1] >= 3) * (S[, 2] >= 3)
+  tau = delta * (S[, 1] >= Group.level.number[1]) * (S[, 2] >= (Group.level.number[2] -1)) * ((setting != "HTE") + (setting == "HTE") * X[, 1]) #  (S[, 1] >= 3) * (S[, 2] >= 3)
   tau.group = sapply(seq(1, Group.number), function(x) {
     mean(tau[Group == x])
   }) # average treatment effect in each group.
@@ -80,19 +82,19 @@ for(i in 1:m){
   record$power$RT[i] = sum(tau.group[record$R$RT[[i]]] != 0) / max(1, sum(tau.group != 0))
   
   # SSRT: sample-splitting RT  
-  record$pValue$SSRT[i,] = SS(Y = Y, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method)$pval
+  record$pValue$SSRT[i,] = SS(Y = Y, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method, nuisance.learner.method = nuisance.learner.method)$pval
   record$R$SSRT[[i]] = which(record$pValue$SSRT[i,] <= BH.threshold(pval = record$pValue$SSRT[i,], q = q))
   record$FDP$SSRT[i] = sum(tau.group[record$R$SSRT[[i]]] == 0) / max(1, length(record$R$SSRT[[i]]))
   record$power$SSRT[i] = sum(tau.group[record$R$SSRT[[i]]] != 0) / max(1, sum(tau.group != 0))
   
   # DDRT: double-dipping RT
-  record$pValue$DDRT[i,] = DD(Y = Y, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method)$pval
+  record$pValue$DDRT[i,] = DD(Y = Y, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method, nuisance.learner.method = nuisance.learner.method)$pval
   record$R$DDRT[[i]] = which(record$pValue$DDRT[i,] <= BH.threshold(pval = record$pValue$DDRT[i,], q = q))
   record$FDP$DDRT[i] = sum(tau.group[record$R$DDRT[[i]]] == 0) / max(1, length(record$R$DDRT[[i]]))
   record$power$DDRT[i] = sum(tau.group[record$R$DDRT[[i]]] != 0) / max(1, sum(tau.group != 0))
   
   # ART: augmented RT
-  record$pValue$ART[i,] = ART(Y = Y, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method, B = B)$pval
+  record$pValue$ART[i,] = ART(Y = Y, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method, nuisance.learner.method = nuisance.learner.method, B = B)$pval
   record$R$ART[[i]] = which(record$pValue$ART[i,] <= BH.threshold(pval = record$pValue$ART[i,], q = q))
   record$FDP$ART[i] = sum(tau.group[record$R$ART[[i]]] == 0) / max(1, length(record$R$ART[[i]]))
   record$power$ART[i] = sum(tau.group[record$R$ART[[i]]] != 0) / max(1, sum(tau.group != 0))
