@@ -14,11 +14,11 @@ library(ggplot2)
 
 plot.data <- data.frame(
   Group.number = Group.number.seq,
-  RT_FDR = apply(record$FDP$RT, 2, mean),
-  SSRT_FDR = apply(record$FDP$SSRT, 2, mean),
+  ORT_FDR = apply(record$FDP$ORT, 2, mean),
+  DDRT_FDR = apply(record$FDP$DDRT, 2, mean),
   ART_FDR = apply(record$FDP$ART, 2, mean),
-  RT_power = apply(record$power$RT, 2, mean),
-  SSRT_power = apply(record$power$SSRT, 2, mean),
+  ORT_power = apply(record$power$ORT, 2, mean),
+  DDRT_power = apply(record$power$DDRT, 2, mean),
   ART_power = apply(record$power$ART, 2, mean)
 )
 
@@ -30,16 +30,16 @@ plot.data <- data.frame(
 # plot.data$ART_power[5] = mean(record.2$power$ART)
 
 line.width = 2; point.size = 3
-pdf(file = paste(plotDirectory, "/", setting, "FDR", ".pdf", sep = ""), width = 3.8, height = 3.5)
+pdf(file = paste(plotDirectory, "/", setting, "FDR", "_Oracle.pdf", sep = ""), width = 3.8, height = 3.5)
 ggplot(plot.data, aes(x = Group.number)) +
   geom_hline(yintercept = q, linetype = "dashed", color = "black") +  # Add horizontal reference line
-  geom_point(aes(y = RT_FDR, color = "RT"), size = point.size) +
-  geom_line(aes(y = RT_FDR, color = "RT"), size = line.width) +  # RT curve in black
-  geom_point(aes(y = SSRT_FDR, color = "SRT"), size = point.size) +
-  geom_line(aes(y = SSRT_FDR, color = "SRT"), size = line.width) +  # SSRT curve in dark blue
+  geom_point(aes(y = ORT_FDR, color = "RT(Oracle)"), size = point.size) +
+  geom_line(aes(y = ORT_FDR, color = "RT(Oracle)"), size = line.width) +  # RT curve in black
+  geom_point(aes(y = DDRT_FDR, color = "RT(Double dipping)"), size = point.size) +
+  geom_line(aes(y = DDRT_FDR, color = "RT(Double dipping)"), size = line.width) +  # SSRT curve in dark blue
   geom_point(aes(y = ART_FDR, color = "ART"), size = point.size) +  
   geom_line(aes(y = ART_FDR, color = "ART"), size = line.width ) +  # ART curve in dark red
-  scale_color_manual( values = c("RT" = "#9467bd", "SRT" = "#1f77b4", "ART" = "#d35400"), breaks = c("RT", "SRT", "ART")) +
+  scale_color_manual( values = c("RT(Oracle)" = "#9467bd", "RT(Double dipping)" = "#1f77b4", "ART" = "#d35400"), breaks = c("RT(Oracle)", "RT(Double dipping)", "ART")) +
   labs(# title = "FDR",
     x = "Number of subgroups",
     y = "FDR",
@@ -49,7 +49,7 @@ ggplot(plot.data, aes(x = Group.number)) +
   theme(
     legend.background = element_rect(fill = "white", color = "black"), # Black box with white background
     #legend.key = element_rect(fill = "white", color = "black"),         # Non-transparent legend keys
-    legend.position = c(0.805, 0.74),        # Position legend to top right
+    legend.position = c(0.615, 0.74),        # Position legend to top right
     axis.title.x = element_text(size = 14),  # Increase x-axis title size
     axis.title.y = element_text(size = 14),  # Increase y-axis title size
     axis.text.x = element_text(size = 13),   # Increase x-axis text size
@@ -59,16 +59,16 @@ ggplot(plot.data, aes(x = Group.number)) +
   )
 dev.off()
 
-pdf(file = paste(plotDirectory, "/", setting, "Power", ".pdf", sep = ""), width = 3.8, height = 3.5)
+pdf(file = paste(plotDirectory, "/", setting, "Power", "_Oracle.pdf", sep = ""), width = 3.8, height = 3.5)
 line.width = 2; point.size = 3
 ggplot(plot.data, aes(x = Group.number)) +
-  geom_point(aes(y = RT_power, color = "RT"), size = point.size) +
-  geom_line(aes(y = RT_power, color = "RT"), size = line.width) +  # RT curve in black
-  geom_point(aes(y = SSRT_power, color = "SRT"), size = point.size) +
-  geom_line(aes(y = SSRT_power, color = "SRT"), size = line.width) +  # SSRT curve in dark blue
+  geom_point(aes(y = ORT_power, color = "RT(Oracle)"), size = point.size) +
+  geom_line(aes(y = ORT_power, color = "RT(Oracle)"), size = line.width) +  # RT curve in black
+  geom_point(aes(y = DDRT_power, color = "RT(Double dipping)"), size = point.size) +
+  geom_line(aes(y = DDRT_power, color = "RT(Double dipping)"), size = line.width) +  # SSRT curve in dark blue
   geom_point(aes(y = ART_power, color = "ART"), size = point.size) +  
-  geom_line(aes(y = ART_power, color = "ART"), size = line.width) +
-  scale_color_manual( values = c("RT" = "#9467bd", "SRT" = "#1f77b4", "ART" = "#d35400"), breaks = c("RT", "SRT", "ART")) +
+  geom_line(aes(y = ART_power, color = "ART"), size = line.width ) +  # ART curve in dark red
+  scale_color_manual( values = c("RT(Oracle)" = "#9467bd", "RT(Double dipping)" = "#1f77b4", "ART" = "#d35400"), breaks = c("RT(Oracle)", "RT(Double dipping)", "ART")) +
   labs(# title = "Power",
     x = "Number of subgroups",
     y = "Power",
