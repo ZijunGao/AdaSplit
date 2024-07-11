@@ -24,7 +24,7 @@ permutation.p.value = function(stats, stats.ref){
 }
 
 # nuisance learner
-nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...){
+nuisance.learner = function(Y, W, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...){
   n = length(Y)
   data.train = data.frame(Y, X, G, W - prop, (W-prop) * X, (W-prop) * G)
   data.0 = data.frame(Y, X, G, 0 - prop, (0 - prop) * X, (0 - prop) * G); colnames(data.0) = colnames(data.train)
@@ -214,8 +214,8 @@ test.stats.group = function(Y, W, X = NULL, G = NULL, Group, stats = "denoise", 
 # oracle
   # Example:
   # set.seed(318)
-  # ORT(Y = Y, X = X, G = G, Group = Group, prop = p, mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = 100, test.stats.method = "denoise")$pval
-ORT = function(Y, X, G, Group, prop = NULL, mu0, mu1, mu, tau, test.stats.method = "denoise",  treatment.assignment = "Bernoulli", M = 10) {
+  # ORT(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = 100, test.stats.method = "denoise")$pval
+ORT = function(Y, W, X, G, Group, prop = NULL, mu0, mu1, mu, tau, test.stats.method = "denoise",  treatment.assignment = "Bernoulli", M = 10) {
   # Convert X and G to matrix format
   X = as.matrix(X)
   G = as.matrix(G)
@@ -241,8 +241,8 @@ ORT = function(Y, X, G, Group, prop = NULL, mu0, mu1, mu, tau, test.stats.method
 
 # standard RT
   # set.seed(318)
-  # RT(Y = Y, X = X, G = G, Group = Group, prop = p, M = 100)$pval
-RT = function(Y, X, G, Group, prop = NULL, treatment.assignment = "Bernoulli", M = 10){
+  # RT(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = 100)$pval
+RT = function(Y, W, X, G, Group, prop = NULL, treatment.assignment = "Bernoulli", M = 10){
   # Convert X and G to matrix format
   X = as.matrix(X)
   G = as.matrix(G)
@@ -268,8 +268,8 @@ RT = function(Y, X, G, Group, prop = NULL, treatment.assignment = "Bernoulli", M
 # double dipping
 # Example:
 # set.seed(318)
-# DD(Y = Y, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "denoise")$pval
-DD = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10){
+# DD(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "denoise")$pval
+DD = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10){
   # Convert X and G to matrix format
   X = as.matrix(X)
   G = as.matrix(G)
@@ -300,8 +300,8 @@ DD = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", t
 # TODO: other treatmnet assignment
   # Example:
   # set.seed(318)
-  # SS(Y = Y, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "denoise")$pval
-SS = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10){
+  # SS(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "denoise")$pval
+SS = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10){
   # Convert X and G to matrix format
   X = as.matrix(X)
   G = as.matrix(G)
@@ -333,8 +333,8 @@ SS = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", t
 # double-dipping
   # Example:
   # set.seed(318)
-  # DD(Y = Y, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "denoise")$pval
-DD = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10){
+  # DD(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "denoise")$pval
+DD = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10){
   # Convert X and G to matrix format
   X = as.matrix(X)
   G = as.matrix(G)
@@ -364,8 +364,8 @@ DD = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", t
 # panning
   # Example:
   # set.seed(318)
-  # ART(Y = Y, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "ATE")$pval
-ART = function(Y, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10, B = 1){
+  # ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "ATE")$pval
+ART = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10, B = 1){
   # Convert X and G to matrix format
   X = as.matrix(X)
   G = as.matrix(G)
