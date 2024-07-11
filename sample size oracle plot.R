@@ -5,7 +5,7 @@ plotDirectory = file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/063
 
 setting = c("SampleSize")
 record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
-n.seq = seq(400, 800, by = 100)
+n.seq = seq(400, 1200, by = 200)
 q = 0.2 # FDR level
 
 plot.data <- data.frame(
@@ -25,16 +25,16 @@ ggplot(plot.data, aes(x = n)) +
   geom_hline(yintercept = q, linetype = "dashed", color = "black") +  # Add horizontal reference line
   geom_point(aes(y = ORT_FDR, color = "RT(Oracle)"), size = point.size) +
   geom_line(aes(y = ORT_FDR, color = "RT(Oracle)"), size = line.width) +  # RT curve in black
-  geom_point(aes(y = DDRT_FDR, color = "RT(Double dipping)"), size = point.size) +
-  geom_line(aes(y = DDRT_FDR, color = "RT(Double dipping)"), size = line.width) +  # SSRT curve in dark blue
+  geom_point(aes(y = DDRT_FDR, color = "RT(DD)"), size = point.size) +
+  geom_line(aes(y = DDRT_FDR, color = "RT(DD)"), size = line.width) +  # SSRT curve in dark blue
   geom_point(aes(y = ART_FDR, color = "ART"), size = point.size) +  
   geom_line(aes(y = ART_FDR, color = "ART"), size = line.width ) +  # ART curve in dark red
-  scale_color_manual( values = c("RT(Oracle)" = "#9467bd", "RT(Double dipping)" = "#1f77b4", "ART" = "#d35400"), breaks = c("RT(Oracle)", "RT(Double dipping)", "ART")) +
+  scale_color_manual(values = c("RT(Oracle)" = "#7f7f7f", "RT(DD)" = "#2ca02c", "ART" = "#d35400"), breaks = c("RT(Oracle)", "RT(DD)", "ART")) +
   labs(# title = "FDR",
     x = "Sample size",
     y = "FDR",
     color = "Method") +
-  scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +  # Custom y-axis breaks
+  scale_y_continuous(breaks = seq(0, 0.8, by = 0.2), limits = c(0, 0.8)) +  # Custom y-axis breaks
   theme_bw() +
   theme(
     legend.position = "none",
@@ -52,11 +52,11 @@ pdf(file = paste(plotDirectory, "/", setting, "Power", "_Oracle.pdf", sep = ""),
 ggplot(plot.data, aes(x = n)) +
   geom_point(aes(y = ORT_power, color = "RT(Oracle)"), size = point.size) +
   geom_line(aes(y = ORT_power, color = "RT(Oracle)"), size = line.width) +  # RT curve in black
-  geom_point(aes(y = DDRT_power, color = "RT(Double dipping)"), size = point.size) +
-  geom_line(aes(y = DDRT_power, color = "RT(Double dipping)"), size = line.width) +  # SSRT curve in dark blue
+  geom_point(aes(y = DDRT_power, color = "RT(DD)"), size = point.size) +
+  geom_line(aes(y = DDRT_power, color = "RT(DD)"), size = line.width) +  # SSRT curve in dark blue
   geom_point(aes(y = ART_power, color = "ART"), size = point.size) +  
   geom_line(aes(y = ART_power, color = "ART"), size = line.width ) +  # ART curve in dark red
-  scale_color_manual( values = c("RT(Oracle)" = "#9467bd", "RT(Double dipping)" = "#1f77b4", "ART" = "#d35400"), breaks = c("RT(Oracle)", "RT(Double dipping)", "ART")) +
+  scale_color_manual( values = c("RT(Oracle)" = "#7f7f7f" , "RT(DD)" = "#2ca02c", "ART" = "#d35400"), breaks = c("RT(Oracle)", "RT(DD)", "ART")) +
   labs(# title = "Power",
     x = "Sample size",
     y = "Power",
