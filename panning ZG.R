@@ -2,17 +2,17 @@
 rm(list = ls())
 source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper.R")
 
-n = 400 # sample size
+n = 800 # sample size; 400
 d = 5 # number of covariates
 p = 0.5 # propensity score
 Group.level.number = c(4, 4) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
-beta0 = 1; beta = rep(1, d) * sqrt(1/2/d); theta = rep(1, 2) * sqrt(1/2/2)
-delta = sqrt(2)
+beta0 = 1; beta = rep(1, d); theta = rep(1, 2)
+delta = 1.5
 sigma = 1 # error magnitude in generating Y(0)
 
 test.stats.method = "AIPW + ITE" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE", "AIPW + ITE"; test statistic
-B = 5 # number of knockoffs
+B = 6 # number of knockoffs
 M = 400 # number of permutations
 q = 0.2 # FDR level
 nuisance.learner.method = "linear" # "linear", "gradient boosting" 
@@ -36,7 +36,7 @@ if(setting == "B1"){B = 1}
 if(setting == "gradient boosting"){nuisance.learner.method = "gradient boosting"}
 
 start.time = proc.time()
-m = 400 # number of trials
+m = 40 # number of trials
 record = list()
 record$pValue = list()
 record$pValue$ORT = record$pValue$RT = record$pValue$SSRT = record$pValue$DDRT = record$pValue$ART = matrix(0, nrow = m, ncol = Group.number) # ORT: oracle RT; RT (baseline): standard RT; SSRT: sample-splitting RT; DDRT: double-dipping RT; ART: augmented RT; 

@@ -24,7 +24,7 @@ permutation.p.value = function(stats, stats.ref){
 }
 
 # nuisance learner
-nuisance.learner = function(Y, W, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...){
+nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...){
   n = length(Y)
   data.train = data.frame(Y, X, G, W - prop, (W-prop) * X, (W-prop) * G)
   data.0 = data.frame(Y, X, G, 0 - prop, (0 - prop) * X, (0 - prop) * G); colnames(data.0) = colnames(data.train)
@@ -75,7 +75,7 @@ nuisance.learner = function(Y, W, X = NULL, prop = NULL, G = NULL, W = NULL, met
     #val.pred <- predict(nuisance.mu, newdata = dval)
     
     # Calculate residuals for training and validation data
-    train.residual <- (train.data$Y - train.pred) / train.data[, num_cols-1]
+    train.residual <- (train.data$Y - train.pred) / train.data[, num_cols-1] # train.data[, num_cols-1] could be zero
     #val.residual <- (val.data$Y - val.pred) / val.data[, num_cols-1]
     
     
