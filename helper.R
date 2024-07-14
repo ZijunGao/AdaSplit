@@ -26,17 +26,17 @@ permutation.p.value = function(stats, stats.ref){
 # nuisance learner
 nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...){
   n = length(Y)
-  data.train = data.frame(Y, X, G, W - prop, (W-prop) * X, (W-prop) * G)
-  data.0 = data.frame(Y, X, G, 0 - prop, (0 - prop) * X, (0 - prop) * G); colnames(data.0) = colnames(data.train)
-  data.1 = data.frame(Y, X, G, 1 - prop, (1 - prop) * X, (1 - prop) * G); colnames(data.1) = colnames(data.train)
-  
+
   if(method == "linear"){
+    data.train = data.frame(Y, X, G, W - prop, (W-prop) * X, (W-prop) * G)
+    data.0 = data.frame(Y, X, G, 0 - prop, (0 - prop) * X, (0 - prop) * G); colnames(data.0) = colnames(data.train)
+    data.1 = data.frame(Y, X, G, 1 - prop, (1 - prop) * X, (1 - prop) * G); colnames(data.1) = colnames(data.train)
     nuisance.model = lm(Y ~ ., data = data.train[train.index,])
     mu0.hat = predict(nuisance.model, newdata = data.0[test.index, ])
     mu1.hat = predict(nuisance.model, newdata = data.1[test.index, ])
   }else if(method == "gradient boosting"){
     
-    data.full = data.frame(X, G, W - prop,Y)
+    data.full = data.frame(X, W - prop,Y)
     #train.index_1 <- createDataPartition(data.full$Y[train.index], p = 0.9, list = FALSE) # 90% training data
     train.data <- data.full[train.index,]#[train.index_1, ]
     #val.data <- data.full[train.index,][-train.index_1, ]
@@ -139,7 +139,7 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
   
   #mu.hat = mu0.hat * (1 - prop) + mu1.hat * prop
   #tau.hat = mu1.hat -  mu0.hat
-  return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat)) 
+  return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
 }
 
 
@@ -156,33 +156,39 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
 #   test.stats(Y, W, X = X, G = G, "denoise + ATE", mu.hat, tau.hat)
 #   test.stats(Y, sample(W), X = X, G = G, "ITE", mu0.hat, mu1.hat)
 test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, mu0.hat = NULL, mu1.hat = NULL, mu.hat = NULL, tau.hat = NULL) {
+  
+  n = length(Y)
+  if (is.null(prop)){
+    n1 = max(1, sum(W))
+    n0 = max(1, sum(1 - W))
+  }else{
+    n1 = n * prop
+    n0 = n * (1 - prop)
+  }
+  
   if (stats == "plain") {
     # Absolute value of the plain difference in means
     # value = abs(sum(W * Y) / max(1, sum(W)) - sum((1 - W) * Y) / max(1, sum(1 - W)))
-    n = length(Y)
-    value = abs(sum(W * Y) / (n * prop) - sum((1 - W) * Y) / (n * (1 - prop)))
+    value = abs(sum(W * Y) / n1 - sum((1 - W) * Y) / n0)
   }else if (stats == "denoise") {
     # Absolute value of the difference in means with denoising using mu.hat
-    value = abs(sum(W * (Y - mu.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu.hat)) / max(1, sum(1 - W)))
+    value = abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0)
     
   }else if (stats == "ATE") {
     # Absolute difference between the difference in means and the estimated ATE
-    value = -abs(sum(W * Y) / max(1, sum(W)) - sum((1 - W) * Y) / max(1, sum(1 - W)) - mean(tau.hat))
+    value = -abs(sum(W * Y) / n1 - sum((1 - W) * Y) / n0 - mean(tau.hat))
   }else if (stats == "denoise + ATE") {
     # Negative absolute difference between the difference in means with denoising using mu.hat and the estimated ATE
-    value = -abs(sum(W * (Y - mu.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu.hat)) / max(1, sum(1 - W)) - mean(tau.hat))
+    value = -abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0 - mean(tau.hat))
   }else if(stats == "AIPW"){
     # value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
-    n = length(Y)
-    value  = abs(sum(W * (Y - mu1.hat)) / (n * prop) - sum((1 - W) * (Y - mu0.hat)) / (n * (1 - prop)) + mean(tau.hat))
+    value  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat))
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
     # value = -mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
     value = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
   }else if(stats == "AIPW + ITE"){
-    # value1  = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat)) / sqrt(min(1, sum(W)) / max(1, sum(W)) +  min(1, sum(W)) / max(1, sum(1 - W)))
-    n = length(Y)
-    value1  = abs(sum(W * (Y - mu1.hat)) / (n * prop) - sum((1 - W) * (Y - mu0.hat)) / (n * (1 - prop)) + mean(tau.hat)) / sqrt(1 / (n * prop) + 1 / (n * (1 - prop)))
+    value1  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat)) / sqrt(1 / n1 + 1 /n0)
     # value2 = - mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
     value2 = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
     value = value1 + value2 
@@ -374,7 +380,12 @@ ART = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear
   n = length(Y)
   
   # Estimate the nuisance functions
-  W.knockoff = matrix(rbinom(n * B, 1, p), ncol = B) # TODO
+  if (is.null(prop)){
+    W.knockoff = permute_within_groups(W, Group, B)
+  }else{
+    W.knockoff = matrix(rbinom(n * B, 1, p), ncol = B) 
+  }
+  
   W.aug = cbind(W, W.knockoff)
   W.tilde = apply(W.aug, 1, mean) # TODO more knockoffs
   nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W.tilde, method = nuisance.learner.method, train.index = seq(1, n), test.index = seq(1, n))
@@ -391,6 +402,45 @@ ART = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear
     })
     
     return(list(pval = pval, test.stats = test.stats.value, test.stats.ref = test.stats.ref))
+}
+
+
+
+
+permute_within_groups <- function(W, G, B) {
+  # Ensure that W and G have the same length
+  if (length(W) != length(G)) {
+    stop("The length of W and G must be the same.")
+  }
+  
+  # Initialize the matrix to store the original and permuted vectors
+  n <- length(W)
+  permutations_matrix <- matrix(NA, nrow = n, ncol = B + 1)
+  
+  # Store the original W as the first column
+  permutations_matrix[, 1] <- W
+  
+  # Get the unique group labels
+  unique_groups <- unique(G)
+  
+  for (b in 1:B) {
+    # Create a copy of W to store the permuted values
+    W_permuted <- W
+    
+    # Permute the elements of W within each group
+    for (group in unique_groups) {
+      # Get the indices of elements in the current group
+      group_indices <- which(G == group)
+      
+      # Permute the elements within the current group
+      W_permuted[group_indices] <- sample(W[group_indices])
+    }
+    
+    # Store the permuted vector in the matrix
+    permutations_matrix[, b + 1] <- W_permuted
+  }
+  
+  return(permutations_matrix)
 }
 
 

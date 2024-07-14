@@ -35,12 +35,17 @@ record$power = record$FDP
 set.seed(318)
 for(i in 1:m){
   # generate data
-  S = cbind(apply(rmultinom(n, 1, rep(1, Group.level.number[1])), 2, which.max),
-            apply(rmultinom(n, 1, rep(1, Group.level.number[2])), 2, which.max)) # S used to define subgroups
+  X = matrix(rnorm(n * d, 0, 1), nrow = n, ncol = d) # covariates
+  
+  quantiles_1 <- quantile(c(-Inf,X[,d-1],Inf), probs = seq(0, 1, length.out = Group.level.number[1] + 1))
+  quantiles_2 <- quantile(c(-Inf,X[,d-2],Inf), probs = seq(0, 1, length.out = Group.level.number[2] + 1))
+  S = cbind(as.numeric(cut(X[,d-1], quantiles_1)), as.numeric(cut(X[,d-2], quantiles_2)))
+  
   Group = (S[, 1] - 1) * Group.level.number[2] + S[, 2]; 
   G = model.matrix(~ factor(Group))[, -1] # one-hot encoding of group membership
-  X = matrix(rnorm(n * d, 0, 1), nrow = n, ncol = d) # covariates
+  
   W = rbinom(n, 1, p) # treatment assignment
+  
   # potential outcomes
   # mu0 is linear in X and S
   Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
@@ -58,7 +63,7 @@ for(i in 1:m){
   
   # inference
   # ORT (oracle): RT with true nuisance functions
-  record$pValue$ORT[i,] = ORT(Y = Y, X = X, G = G, Group = Group, prop = p, test.stats.method = test.stats.method, mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = M)$pval
+  record$pValue$ORT[i,] = ORT(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = test.stats.method, mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = M)$pval
   record$R$ORT[[i]] = which(record$pValue$ORT[i,] <= BH.threshold(pval = record$pValue$ORT[i,], q = q))
   record$FDP$ORT[i] = sum(tau.group[record$R$ORT[[i]]] == 0) / max(1, length(record$R$ORT[[i]]))
   record$power$ORT[i] = sum(tau.group[record$R$ORT[[i]]] != 0) / max(1, sum(tau.group != 0))
@@ -66,7 +71,7 @@ for(i in 1:m){
   # ART: augmented RT
   for(j in seq(1, length(B.seq))){
     B = B.seq[j]
-    record$pValue$ART[i,,j] = ART(Y = Y, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method, B = B)$pval
+    record$pValue$ART[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method, B = B)$pval
     record$R$ART[[j]][[i]] = which(record$pValue$ART[i,,j] <= BH.threshold(pval = record$pValue$ART[i,,j], q = q))
     record$FDP$ART[i,j] = sum(tau.group[record$R$ART[[j]][[i]]] == 0) / max(1, length(record$R$ART[[j]][[i]]))
     record$power$ART[i,j] = sum(tau.group[record$R$ART[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))

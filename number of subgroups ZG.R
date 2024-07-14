@@ -6,7 +6,7 @@ source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper.R")
 n = 800 # sample size
 d = 5 # number of covariates
 p = 0.5 # propensity score
-Group.level.number = c(2, 4) # number of levels per group
+Group.level.number = c(4, 4) # number of levels per group
 Group.level.number2.seq = seq(4, 8)
 beta0 = 1; beta = rep(1, d) * 1; theta = rep(1, 2)
 delta = 1.5
@@ -34,12 +34,17 @@ for(j in 1 : length(Group.level.number2.seq)){
   Group.number = prod(Group.level.number) # total number of groups
   for(i in 1:m){
     # generate data
-    S = cbind(apply(rmultinom(n, 1, rep(1, Group.level.number[1])), 2, which.max),
-              apply(rmultinom(n, 1, rep(1, Group.level.number[2])), 2, which.max)) # S used to define subgroups
+    X = matrix(rnorm(n * d, 0, 1), nrow = n, ncol = d) # covariates
+    
+    quantiles_1 <- quantile(c(-Inf,X[,d-1],Inf), probs = seq(0, 1, length.out = Group.level.number[1] + 1))
+    quantiles_2 <- quantile(c(-Inf,X[,d-2],Inf), probs = seq(0, 1, length.out = Group.level.number[2] + 1))
+    S = cbind(as.numeric(cut(X[,d-1], quantiles_1)), as.numeric(cut(X[,d-2], quantiles_2)))
+    
     Group = (S[, 1] - 1) * Group.level.number[2] + S[, 2]; 
     G = model.matrix(~ factor(Group))[, -1] # one-hot encoding of group membership
-    X = matrix(rnorm(n * d, 0, 1), nrow = n, ncol = d) # covariates
+    
     W = rbinom(n, 1, p) # treatment assignment
+    
     # potential outcomes
     # mu0 is linear in X and S
     Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
@@ -57,31 +62,31 @@ for(j in 1 : length(Group.level.number2.seq)){
     
     # inference
     # ORT (oracle): RT with true nuisance functions
-    record$pValue$ORT[i,seq(1, Group.number),j] = ORT(Y = Y, X = X, G = G, Group = Group, prop = p, test.stats.method = test.stats.method, mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = M)$pval
+    record$pValue$ORT[i,seq(1, Group.number),j] = ORT(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = test.stats.method, mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = M)$pval
     record$R$ORT[[j]][[i]] = which(record$pValue$ORT[i,seq(1, Group.number),j] <= BH.threshold(pval = record$pValue$ORT[i,seq(1, Group.number),j], q = q))
     record$FDP$ORT[i, j] = sum(tau.group[record$R$ORT[[j]][[i]]] == 0) / max(1, length(record$R$ORT[[j]][[i]]))
     record$power$ORT[i, j] = sum(tau.group[record$R$ORT[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
     # RT (baseline): standard RT
-    record$pValue$RT[i,seq(1, Group.number),j] = RT(Y = Y, X = X, G = G, Group = Group, prop = p, M = M)$pval
+    record$pValue$RT[i,seq(1, Group.number),j] = RT(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M)$pval
     record$R$RT[[j]][[i]] = which(record$pValue$RT[i,seq(1, Group.number),j] <= BH.threshold(pval = record$pValue$RT[i,seq(1, Group.number),j], q = q))
     record$FDP$RT[i, j] = sum(tau.group[record$R$RT[[j]][[i]]] == 0) / max(1, length(record$R$RT[[j]][[i]]))
     record$power$RT[i, j] = sum(tau.group[record$R$RT[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
     # SSRT: sample-splitting RT  
-    record$pValue$SSRT[i,seq(1, Group.number),j] = SS(Y = Y, X = X, G = G, Group = Group, prop = p, M = M,nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method)$pval
+    record$pValue$SSRT[i,seq(1, Group.number),j] = SS(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M,nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method)$pval
     record$R$SSRT[[j]][[i]] = which(record$pValue$SSRT[i,seq(1, Group.number),j] <= BH.threshold(pval = record$pValue$SSRT[i,seq(1, Group.number),j], q = q))
     record$FDP$SSRT[i, j] = sum(tau.group[record$R$SSRT[[j]][[i]]] == 0) / max(1, length(record$R$SSRT[[j]][[i]]))
     record$power$SSRT[i,j] = sum(tau.group[record$R$SSRT[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
     # DDRT: double-dipping RT
-    record$pValue$DDRT[i,seq(1, Group.number),j] = DD(Y = Y, X = X, G = G, Group = Group, prop = p, M = M,nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method)$pval
+    record$pValue$DDRT[i,seq(1, Group.number),j] = DD(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M,nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method)$pval
     record$R$DDRT[[j]][[i]] = which(record$pValue$DDRT[i,seq(1, Group.number),j] <= BH.threshold(pval = record$pValue$DDRT[i,seq(1, Group.number),j], q = q))
     record$FDP$DDRT[i, j] = sum(tau.group[record$R$DDRT[[j]][[i]]] == 0) / max(1, length(record$R$DDRT[[j]][[i]]))
     record$power$DDRT[i, j] = sum(tau.group[record$R$DDRT[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
     # ART: augmented RT
-    record$pValue$ART[i,seq(1, Group.number),j] = ART(Y = Y, X = X, G = G, Group = Group, prop = p, M = M,nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method, B = B)$pval
+    record$pValue$ART[i,seq(1, Group.number),j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M,nuisance.learner.method = nuisance.learner.method, test.stats.method = test.stats.method, B = B)$pval
     record$R$ART[[j]][[i]] = which(record$pValue$ART[i,seq(1, Group.number),j] <= BH.threshold(pval = record$pValue$ART[i,seq(1, Group.number),j], q = q))
     record$FDP$ART[i, j] = sum(tau.group[record$R$ART[[j]][[i]]] == 0) / max(1, length(record$R$ART[[j]][[i]]))
     record$power$ART[i, j] = sum(tau.group[record$R$ART[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))

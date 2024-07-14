@@ -5,7 +5,7 @@ plotDirectory = file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/063
 setting = "NumberSubgroup"
 record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
 # record.2 = readRDS(file.path(path, paste("AIPW + ITE", "rds", sep = ".")))
-Group.level.number = c(2, 4) # number of levels per group
+Group.level.number = c(4, 4) # number of levels per group
 Group.level.number2.seq = seq(4, 8)
 Group.number.seq = Group.level.number[1] * Group.level.number2.seq 
 q = 0.2 # FDR level
@@ -44,7 +44,8 @@ ggplot(plot.data, aes(x = Group.number)) +
     x = "Number of subgroups",
     y = "FDR",
     color = "Method") +
-  scale_y_continuous(breaks = seq(0, 0.6, by = 0.2), limits = c(0, 0.6)) +  # Custom y-axis breaks
+  scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +  # Custom y-axis breaks
+  scale_x_continuous(breaks = seq(16, 32, by = 4))+
   theme_bw() +
   theme(
     legend.background = element_rect(fill = "white", color = "black"), # Black box with white background
@@ -74,6 +75,7 @@ ggplot(plot.data, aes(x = Group.number)) +
     y = "Power",
     color = "Method") +
   scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +  # Custom y-axis breaks
+  scale_x_continuous(breaks = seq(16, 32, by = 4))+
   theme_bw() +
   theme(
     legend.position = "none",
