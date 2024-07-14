@@ -34,6 +34,11 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     nuisance.model = lm(Y ~ ., data = data.train[train.index,])
     mu0.hat = predict(nuisance.model, newdata = data.0[test.index, ])
     mu1.hat = predict(nuisance.model, newdata = data.1[test.index, ])
+    mu.hat = mu0.hat * (1 - prop) + mu1.hat * prop
+    tau.hat = mu1.hat -  mu0.hat
+    
+    return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat)) 
+    
   }else if(method == "gradient boosting"){
     
     data.full = data.frame(X, W - prop,Y)
@@ -134,12 +139,9 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     
     #mu0.hat = predict(nuisance.model, newdata = dtest.0)
     #mu1.hat = predict(nuisance.model, newdata = dtest.1)
-
+    return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
   }
-  
-  #mu.hat = mu0.hat * (1 - prop) + mu1.hat * prop
-  #tau.hat = mu1.hat -  mu0.hat
-  return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
+
 }
 
 
