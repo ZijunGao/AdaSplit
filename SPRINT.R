@@ -125,4 +125,4 @@ record$R$ART = which(record$pValue$ART <= BH.threshold(pval = record$pValue$ART,
 
 record
 
-#saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/0630/SPRINT.rds")
+saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/0630/SPRINT.rds")
