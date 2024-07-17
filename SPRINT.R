@@ -92,8 +92,8 @@ nuisance.hat = nuisance.learner(Y = Y, X = X, prop = p, G = G, W = W.tilde, meth
 tree_dump <- xgb.model.dt.tree(model = nuisance.hat$tau)
 print(tree_dump)
 
-#specific_tree <- subset(tree_dump, Tree == 0)
-#print(specific_tree)
+specific_tree <- subset(tree_dump, Tree == 0)
+print(specific_tree)
 
 
 

@@ -5,20 +5,21 @@ source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper.R")
 
 n.seq = seq(400, 1200, by = 200) # sample size
 d = 5 # number of covariates
-p = 0.5 # propensity score
+p = 0.3 # propensity score
 Group.level.number = c(4, 5) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta = rep(1, d) * 1; theta = rep(1, 2)
-delta = 1.5
+beta2 = rep(1,5)
+delta = 0.5
 sigma = 1  # error magnitude in generating Y(0)
 
 nuisance.learner.method = "gradient boosting"
 test.stats.method = "AIPW + ITE" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE"; test statistic
 B = 6 # number of knockoffs: seq(1, 10); c(1, 5, 10)
-M = 200 # number of permutations
+M = 1000 # number of permutations
 q = 0.2 # FDR level
 
-setting = "Statistics"
+setting = "Statistics + HTE"
 
 start.time = proc.time()
 m = 100 # number of trials
@@ -52,50 +53,69 @@ for(j in 1 : length(n.seq)){
     
     # potential outcomes
     # mu0 is linear in X and S
-    Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
+    Y0 = beta0 + X %*% beta + rnorm(n, 0, sigma) # + S %*% theta
     # tau is linear in S and independent of X
-    tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) * (1 + grepl("HTE", setting) * X[,d-1]) #  (S[, 1] >= 3) * (S[, 2] >= 3)
+    tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) * (1+ grepl("HTE", setting)* X %*% beta2) #  (S[, 1] >= 3) * (S[, 2] >= 3)
     tau.group = sapply(seq(1, Group.number), function(x) {
       mean(tau[Group == x])
     }) # average treatment effect in each group.
     Y1 = Y0 + tau
     Y = Y1 * W + Y0 * (1 - W) # observed outcome
     # nuisance functions
-    mu0 =  beta0 + X %*% beta + S %*% theta
-    mu1 =  beta0 + X %*% beta + S %*% theta + tau
+    mu0 =  beta0 + X %*% beta #+ S %*% theta
+    mu1 =  beta0 + X %*% beta + tau #+ S %*% theta
     mu = mu0 * (1 - p) + mu1 * p
     
-    record$pValue$ART1[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "ATE", B = B)$pval
-    record$R$ART1[[j]][[i]] = which(record$pValue$ART1[i,,j] <= BH.threshold(pval = record$pValue$ART1[i,,j], q = q))
-    record$FDP$ART1[i, j] = sum(tau.group[record$R$ART1[[j]][[i]]] == 0) / max(1, length(record$R$ART1[[j]][[i]]))
-    record$power$ART1[i, j] = sum(tau.group[record$R$ART1[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
+    #record$pValue$ART1[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "plain", B = B)$pval
+    #record$R$ART1[[j]][[i]] = which(record$pValue$ART1[i,,j] <= BH.threshold(pval = record$pValue$ART1[i,,j], q = q))
+    #record$FDP$ART1[i, j] = sum(tau.group[record$R$ART1[[j]][[i]]] == 0) / max(1, length(record$R$ART1[[j]][[i]]))
+    #record$power$ART1[i, j] = sum(tau.group[record$R$ART1[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
-    record$pValue$ART2[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "denoise", B = B)$pval
+    
+    record$pValue$ART2[i,,j] = ORT(Y = Y, W = W, X = X, G = G, Group = Group, prop = p,  test.stats.method = "denoise", mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = M)$pval
     record$R$ART2[[j]][[i]] = which(record$pValue$ART2[i,,j] <= BH.threshold(pval = record$pValue$ART2[i,,j], q = q))
     record$FDP$ART2[i, j] = sum(tau.group[record$R$ART2[[j]][[i]]] == 0) / max(1, length(record$R$ART2[[j]][[i]]))
     record$power$ART2[i, j] = sum(tau.group[record$R$ART2[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
-    record$pValue$ART3[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "AIPW", B = B)$pval
+  
+    record$pValue$ART3[i,,j] = ORT(Y = Y, W = W, X = X, G = G, Group = Group, prop = p,  test.stats.method = "AIPW", mu0 = mu0, mu1 = mu1, mu = mu, tau = tau, M = M)$pval
     record$R$ART3[[j]][[i]] = which(record$pValue$ART3[i,,j] <= BH.threshold(pval = record$pValue$ART3[i,,j], q = q))
     record$FDP$ART3[i, j] = sum(tau.group[record$R$ART3[[j]][[i]]] == 0) / max(1, length(record$R$ART3[[j]][[i]]))
     record$power$ART3[i, j] = sum(tau.group[record$R$ART3[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
-    record$pValue$ART4[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "ITE", B = B)$pval
-    record$R$ART4[[j]][[i]] = which(record$pValue$ART4[i,,j] <= BH.threshold(pval = record$pValue$ART4[i,,j], q = q))
-    record$FDP$ART4[i, j] = sum(tau.group[record$R$ART4[[j]][[i]]] == 0) / max(1, length(record$R$ART4[[j]][[i]]))
-    record$power$ART4[i, j] = sum(tau.group[record$R$ART4[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
+    
+    #record$pValue$ART1[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "plain", B = B)$pval
+    #record$R$ART1[[j]][[i]] = which(record$pValue$ART1[i,,j] <= BH.threshold(pval = record$pValue$ART1[i,,j], q = q))
+    #record$FDP$ART1[i, j] = sum(tau.group[record$R$ART1[[j]][[i]]] == 0) / max(1, length(record$R$ART1[[j]][[i]]))
+    #record$power$ART1[i, j] = sum(tau.group[record$R$ART1[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
+    
+    
+    #record$pValue$ART2[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "denoise", B = B)$pval
+    #record$R$ART2[[j]][[i]] = which(record$pValue$ART2[i,,j] <= BH.threshold(pval = record$pValue$ART2[i,,j], q = q))
+    #record$FDP$ART2[i, j] = sum(tau.group[record$R$ART2[[j]][[i]]] == 0) / max(1, length(record$R$ART2[[j]][[i]]))
+    #record$power$ART2[i, j] = sum(tau.group[record$R$ART2[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
+    
+    #record$pValue$ART3[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "AIPW", B = B)$pval
+    #record$R$ART3[[j]][[i]] = which(record$pValue$ART3[i,,j] <= BH.threshold(pval = record$pValue$ART3[i,,j], q = q))
+    #record$FDP$ART3[i, j] = sum(tau.group[record$R$ART3[[j]][[i]]] == 0) / max(1, length(record$R$ART3[[j]][[i]]))
+    #record$power$ART3[i, j] = sum(tau.group[record$R$ART3[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
+    
+    #record$pValue$ART4[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "ITE", B = B)$pval
+    #record$R$ART4[[j]][[i]] = which(record$pValue$ART4[i,,j] <= BH.threshold(pval = record$pValue$ART4[i,,j], q = q))
+    #record$FDP$ART4[i, j] = sum(tau.group[record$R$ART4[[j]][[i]]] == 0) / max(1, length(record$R$ART4[[j]][[i]]))
+    #record$power$ART4[i, j] = sum(tau.group[record$R$ART4[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
     # ART: augmented RT
-    record$pValue$ART5[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "AIPW + ITE", B = B)$pval
-    record$R$ART5[[j]][[i]] = which(record$pValue$ART5[i,,j] <= BH.threshold(pval = record$pValue$ART5[i,,j], q = q))
-    record$FDP$ART5[i, j] = sum(tau.group[record$R$ART5[[j]][[i]]] == 0) / max(1, length(record$R$ART5[[j]][[i]]))
-    record$power$ART5[i, j] = sum(tau.group[record$R$ART5[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
+    #record$pValue$ART5[i,,j] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, nuisance.learner.method = nuisance.learner.method, test.stats.method = "AIPW + ITE", B = B)$pval
+    #record$R$ART5[[j]][[i]] = which(record$pValue$ART5[i,,j] <= BH.threshold(pval = record$pValue$ART5[i,,j], q = q))
+    #record$FDP$ART5[i, j] = sum(tau.group[record$R$ART5[[j]][[i]]] == 0) / max(1, length(record$R$ART5[[j]][[i]]))
+    #record$power$ART5[i, j] = sum(tau.group[record$R$ART5[[j]][[i]]] != 0) / max(1, sum(tau.group != 0))
     
-    print(record$power$ART1[i, j])
+    #print(record$power$ART1[i, j])
     print(record$power$ART2[i, j])
     print(record$power$ART3[i, j])
-    print(record$power$ART4[i, j])
-    print(record$power$ART5[i, j])
+    #print(record$power$ART4[i, j])
+    #print(record$power$ART5[i, j])
     cat("\n")
     
   }

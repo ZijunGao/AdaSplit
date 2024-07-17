@@ -172,7 +172,10 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     value = abs(sum(W * Y) / n1 - sum((1 - W) * Y) / n0)
   }else if (stats == "denoise") {
     # Absolute value of the difference in means with denoising using mu.hat
-    value = abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0)
+   #value = abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0)
+    
+    IF = W * (Y - mu.hat)/prop - (1 - W) * (Y - mu.hat)/(1-prop)
+    value =  abs(mean(IF)/sd(IF))
     
   }else if (stats == "ATE") {
     # Absolute difference between the difference in means and the estimated ATE
@@ -182,7 +185,13 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     value = -abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0 - mean(tau.hat))
   }else if(stats == "AIPW"){
     # value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
-    value  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat))
+    
+    IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) + tau.hat
+    value =  abs(mean(IF)/sd(IF))
+    
+    #value  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat))
+    
+    #value  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat))
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
     # value = -mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
