@@ -8,7 +8,7 @@ p = 0.2 # propensity score
 Group.level.number = c(4, 4) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta = rep(1, d); theta = rep(1, 2)
-delta = 0.5
+delta = 1
 sigma = 1 # error magnitude in generating Y(0)
 
 M = 400 # number of permutations
@@ -21,7 +21,7 @@ start.time = proc.time()
 m = 1000 # number of trials
 record = list()
 record$pValue = list()
-record$pValue$denoise = record$pValue$denoise.normalized = record$pValue$AIPW = record$pValue$AIPW.normalized = matrix(0, nrow = m, ncol = 1) 
+record$pValue$denoise = record$pValue$denoise.normalized = record$pValue$AIPW = record$pValue$AIPW.normalizenad = matrix(0, nrow = m, ncol = 1) 
 
 set.seed(318)
 for(i in 1:m){
@@ -40,7 +40,7 @@ for(i in 1:m){
   if(setting == "constant treatment effect"){
     tau = delta * rep(1, n)
   }else if(setting == "HTE"){
-    tau = delta * (X[,1])^2
+    tau = delta * (X[,1] + 1) # delta * (X[,1])^2
   }
   Y1 = Y0 + tau
   Y = Y1 * W + Y0 * (1 - W) # observed outcome
@@ -70,7 +70,7 @@ record$setting = setting
 par(mfrow = c(1,1))
 # lapply(record$pValue, hist)
 cdf.curve = data.frame(lapply(record$pValue, function(x){sapply(seq(1, 20)/20, function(y)(mean(x <= y)))}))
-matplot(cdf.curve, main = setting, x = seq(1, 20)/20, xlab = "alpha", type = "l", lty = 1); legend("bottomright", colnames(cdf.curve), col = seq(1, 4), lty = 1)
+matplot(cdf.curve, main = setting, x = seq(1, 20)/20, xlab = "alpha", type = "l", lty = 1, col = seq(2, 5), ylim = c(0, 1)); legend("bottomright", colnames(cdf.curve), col = seq(2, 5), lty = 1); abline(a = 0, b = 1, lty = 3)
 
 # saveRDS(record, file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/0630", paste(setting, "rds", sep= ".")))
 
