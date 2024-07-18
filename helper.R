@@ -68,7 +68,7 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
       params = params,
       data = dtrain,
       nrounds = nrounds,
-      lambda = 10,
+      #lambda = 10,
       #watchlist = watchlist,
       #early_stopping_rounds = early_stopping_rounds,
       verbose = 0
@@ -115,7 +115,7 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
       params = params,
       data = dtrain,
       nrounds = nrounds,
-      lambda = 10,
+      #lambda = 10,
       #watchlist = watchlist,
       #early_stopping_rounds = early_stopping_rounds,
       verbose = 0,
@@ -168,6 +168,8 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     n0 = n * (1 - prop)
   }
   
+  IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) + tau.hat
+  
   if (stats == "plain") {
     # Absolute value of the plain difference in means
     # value = abs(sum(W * Y) / max(1, sum(W)) - sum((1 - W) * Y) / max(1, sum(1 - W)))
@@ -186,23 +188,18 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     # Negative absolute difference between the difference in means with denoising using mu.hat and the estimated ATE
     value = -abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0 - mean(tau.hat))
   }else if(stats == "AIPW"){
-    # value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
-    
-    IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) + tau.hat
+
     value =  abs(mean(IF)/sd(IF))
     
-    #value  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat))
-    
-    #value  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat))
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
-    # value = -mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
-    value = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
+    value = mean(abs(IF))/sd(abs(IF))
+    
   }else if(stats == "AIPW + ITE"){
-    value1  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat)) / sqrt(1 / n1 + 1 /n0)
+    #value1  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat)) / sqrt(1 / n1 + 1 /n0)
     # value2 = - mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
-    value2 = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
-    value = value1 + value2 
+   # value2 = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
+    value = abs(mean(IF)/sd(IF)) + mean(abs(IF))/sd(abs(IF)) #value1 + value2 
   }
   
   # Return the computed statistic value

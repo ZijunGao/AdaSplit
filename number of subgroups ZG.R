@@ -12,7 +12,7 @@ beta0 = 1; beta = rep(1, d) * 1; theta = rep(1, 2)
 delta = 1.5
 sigma = 1 # error magnitude in generating Y(0)
 nuisance.learner.method = "gradient boosting"
-test.stats.method = "AIPW + ITE" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE"; test statistic
+test.stats.method = "AIPW" # "denoise", "ATE", "denoise + ATE", "AIPW", "ITE"; test statistic
 B = 6 # number of knockoffs: seq(1, 10); c(1, 5, 10)
 M = 200 # number of permutations
 q = 0.2 # FDR level

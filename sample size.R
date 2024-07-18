@@ -9,7 +9,7 @@ p = 0.5 # propensity score
 Group.level.number = c(4, 5) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta = rep(1, d) * 1; theta = rep(1, 2)
-delta = 1.5
+delta = 1
 sigma = 1  # error magnitude in generating Y(0)
 
 nuisance.learner.method = "gradient boosting"
@@ -48,17 +48,17 @@ for(j in 1 : length(n.seq)){
     
     # potential outcomes
     # mu0 is linear in X and S
-    Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
-    # tau is linear in S and independent of X
-    tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) * ((setting != "HTE") + (setting == "HTE") * X[, 1]) #  (S[, 1] >= 3) * (S[, 2] >= 3)
+    Y0 = beta0 + X**2 %*% beta + S %*% theta + rnorm(n, 0, sigma)
+    # tau is linear in S and independent of X #(setting == "HTE") * 
+    tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) * (1 + abs(X[, 1])) #  (S[, 1] >= 3) * (S[, 2] >= 3)
     tau.group = sapply(seq(1, Group.number), function(x) {
       mean(tau[Group == x])
     }) # average treatment effect in each group.
-    Y1 = Y0 + tau
+    Y1 = beta0 + X**2 %*% beta + S %*% theta + tau + rnorm(n, 0, sigma)
     Y = Y1 * W + Y0 * (1 - W) # observed outcome
     # nuisance functions
-    mu0 =  beta0 + X %*% beta + S %*% theta
-    mu1 =  beta0 + X %*% beta + S %*% theta + tau
+    mu0 =  beta0 + X**2 %*% beta + S %*% theta
+    mu1 =  beta0 + X**2 %*% beta + S %*% theta + tau
     mu = mu0 * (1 - p) + mu1 * p
     
     # inference
