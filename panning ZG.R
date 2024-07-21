@@ -2,9 +2,9 @@
 rm(list = ls())
 source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper.R")
 
-n = 800 # sample size; 400
+n = 400 # sample size; 400
 d = 5 # number of covariates
-p = 0.5 # propensity score
+p = 0.5 # propensity score; 0.5
 Group.level.number = c(4, 4) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta = rep(1, d); theta = rep(1, 2)
@@ -18,7 +18,7 @@ q = 0.2 # FDR level
 nuisance.learner.method = "gradient boosting" # "linear", "gradient boosting" 
 
 # setting
-setting = "HTEAIPW" # "default", "large sample", "few groups", "many groups", "strong baseline", "ATE", "denoise + ATE", "ITE", "AIPW + ITE", "B4", "B1", "HTEAIPW", "HTEITE", "linear", "gradient boosting"
+setting = "default" # "default", "large sample", "few groups", "many groups", "strong baseline", "ATE", "denoise + ATE", "ITE", "AIPW + ITE", "B4", "B1", "HTEAIPW", "HTEITE", "linear", "gradient boosting", "AIPW.normalized"
 if(setting == "large sample"){n = 800}
 if(setting == "few groups"){Group.level.number = c(2, 2); Group.number = prod(Group.level.number)}
 if(setting == "many groups"){Group.level.number = c(4, 4); Group.number = prod(Group.level.number)}
@@ -30,15 +30,18 @@ if(setting == "ATE"){test.stats.method = "ATE"}
 if(setting == "denoise + ATE"){test.stats.method = "denoise + ATE"}
 if(setting == "ITE"){test.stats.method = "ITE"}
 if(setting == "AIPW"){test.stats.method = "AIPW"}
+if(setting == "AIPW.normalized"){test.stats.method = "AIPW normalized"}
 if(setting == "HTEAIPW"){nuisance.learner.method = "linear"; test.stats.method = "AIPW"}
 if(setting == "HTEITE"){nuisance.learner.method = "linear"; test.stats.method = "ITE"}
 if(setting == "B4"){B = 4}
 if(setting == "B1"){B = 1}
 if(setting == "linear"){nuisance.learner.method = "linear"}
 if(setting == "gradient boosting"){nuisance.learner.method = "gradient boosting"}
+if(setting == "unbalanced"){p = 0.2} # DDRT fails to control FDR
+
 
 start.time = proc.time() 
-m = 400 # number of trials
+m = 40 # number of trials
 record = list()
 record$pValue = list()
 record$pValue$ORT = record$pValue$RT = record$pValue$SSRT = record$pValue$DDRT = record$pValue$ART = matrix(0, nrow = m, ncol = Group.number) # ORT: oracle RT; RT (baseline): standard RT; SSRT: sample-splitting RT; DDRT: double-dipping RT; ART: augmented RT; 
@@ -96,10 +99,10 @@ for(i in 1:m){
   record$power$DDRT[i] = sum(tau.group[record$R$DDRT[[i]]] != 0) / max(1, sum(tau.group != 0))
   
   # ART: augmented RT
-  record$pValue$ART[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method, nuisance.learner.method = nuisance.learner.method, B = B)$pval
-  record$R$ART[[i]] = which(record$pValue$ART[i,] <= BH.threshold(pval = record$pValue$ART[i,], q = q))
-  record$FDP$ART[i] = sum(tau.group[record$R$ART[[i]]] == 0) / max(1, length(record$R$ART[[i]]))
-  record$power$ART[i] = sum(tau.group[record$R$ART[[i]]] != 0) / max(1, sum(tau.group != 0))
+  # record$pValue$ART[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = M, test.stats.method = test.stats.method, nuisance.learner.method = nuisance.learner.method, B = B)$pval
+  # record$R$ART[[i]] = which(record$pValue$ART[i,] <= BH.threshold(pval = record$pValue$ART[i,], q = q))
+  # record$FDP$ART[i] = sum(tau.group[record$R$ART[[i]]] == 0) / max(1, length(record$R$ART[[i]]))
+  # record$power$ART[i] = sum(tau.group[record$R$ART[[i]]] != 0) / max(1, sum(tau.group != 0))
   
   if(i %% 10 == 0){print(i)}
 }
