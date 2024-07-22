@@ -29,7 +29,6 @@ permutation.p.value = function(stats, stats.ref, type = "two tailed"){
     # left.tailed.p.value = (sum(stats >= stats.ref[!is.na(stats.ref)]) + 1) / (length(stats.ref[!is.na(stats.ref)]) + 1)
     # return(min(1, 2 * min(right.tailed.p.value, left.tailed.p.value)))
     return((sum(abs(stats) <= abs(stats.ref[!is.na(stats.ref)])) + 1) / (length(stats.ref[!is.na(stats.ref)]) + 1))
-    
   }
 }
 

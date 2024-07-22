@@ -1,4 +1,5 @@
 # Use FRT to test subgroup treatment effects
+# TODO: find a case where denoise > AIPW.normalized; test out the test statistic selection method
 rm(list = ls())
 source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper.R")
 
@@ -20,12 +21,12 @@ q = 0.2 # FDR level
 setting = "default" # "default"
 
 start.time = proc.time()
-m = 400 # number of trials
+m = 40 # number of trials
 record = list()
 record$pValue = list()
 record$pValue$ORT = record$pValue$RT = record$pValue$SSRT = record$pValue$DDRT = record$pValue$ART = matrix(0, nrow = m, ncol = Group.number) # ORT: oracle RT; RT (baseline): standard RT; SSRT: sample-splitting RT; DDRT: double-dipping RT; ART: augmented RT; 
 record$R = list(); record$R$ORT = record$R$RT = record$R$SSRT = record$R$DDRT = record$R$ART = list()
-record$FDP = list(); record$FDP$ORT = record$FDP$RT = record$FDP$SSRT = record$FDP$DDRT = record$FDP$ART = rep(0, m) 
+record$FDP = list(); record$FDP$ORT = record$FDP$RT = record$FDP$SSRT = record$FDP$DDRT = record$FDP$ART = rep(0, m)
 record$power = record$FDP
 
 set.seed(318)
