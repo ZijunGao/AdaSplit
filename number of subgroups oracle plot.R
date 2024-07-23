@@ -44,13 +44,13 @@ ggplot(plot.data, aes(x = Group.number)) +
     x = "Number of subgroups",
     y = "FDR",
     color = "Method") +
-  scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +  # Custom y-axis breaks
+  scale_y_continuous(breaks = seq(0, 0.6, by = 0.2), limits = c(0, 0.6)) +  # Custom y-axis breaks
   scale_x_continuous(breaks = seq(16, 32, by = 4)) +
   theme_bw() +
   theme(
     legend.background = element_rect(fill = "white", color = "black"), # Black box with white background
     #legend.key = element_rect(fill = "white", color = "black"),         # Non-transparent legend keys
-    legend.position = c(0.735, 0.76),        # Position legend to top right
+    legend.position = c(0.745, 0.77),        # Position legend to top right
     axis.title.x = element_text(size = 14),  # Increase x-axis title size
     axis.title.y = element_text(size = 14),  # Increase y-axis title size
     axis.text.x = element_text(size = 13),   # Increase x-axis text size

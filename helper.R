@@ -42,56 +42,43 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
   }else if(method == "gradient boosting"){
     
     data.full = data.frame(X, W - prop,Y)
-    #train.index_1 <- createDataPartition(data.full$Y[train.index], p = 0.9, list = FALSE) # 90% training data
-    train.data <- data.full[train.index,]#[train.index_1, ]
-    #val.data <- data.full[train.index,][-train.index_1, ]
+    train.index_1 <- createDataPartition(data.full$Y[train.index], p = 0.9, list = FALSE) # 90% training data
+    train.data <- data.full[train.index,]
     test.data <- data.full[test.index,]
     
     num_cols <- ncol(data.full)
     features = 1:(num_cols-2)
     # Define the data matrices
     dtrain = xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.data$Y)
-    #dval = xgb.DMatrix(data = as.matrix(val.data[, features]), label = val.data$Y)
     # Define the parameters
     params = list(objective = "reg:squarederror", eval_metric = "rmse")
 
-    #Watchlist to track performance on validation set
-    #watchlist = list(train = dtrain, eval = dval)
-    
+
     # Fit the model with early stopping
-    nrounds = 100  # Maximum number of boosting rounds
-    #early_stopping_rounds =10000  # Stop early if there is no improvement
-    
+    nrounds = 100 
     
     nuisance.mu <- xgb.train(
       #booster = "gblinear",
       params = params,
       data = dtrain,
       nrounds = nrounds,
-      #lambda = 10,
-      #watchlist = watchlist,
-      #early_stopping_rounds = early_stopping_rounds,
       verbose = 0
     )
     
     
     # Make predictions on the training and validation data
     train.pred <- predict(nuisance.mu, newdata = dtrain)
-    #val.pred <- predict(nuisance.mu, newdata = dval)
     
     # Calculate residuals for training and validation data
     train.residual <- (train.data$Y - train.pred) / train.data[, num_cols-1] # train.data[, num_cols-1] could be zero
-    #val.residual <- (val.data$Y - val.pred) / val.data[, num_cols-1]
-    
-    
+
     dtest = xgb.DMatrix(data = as.matrix(test.data[,features]))
     
 
     # Define the data matrices
     dtrain <- xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.residual)
-    #dval <- xgb.DMatrix(data = as.matrix(val.data[, features]), label = val.residual)
-    
-    #watchlist = list(train = dtrain, eval = dval)
+
+
     weights <- abs(train.data[, num_cols-1])**2
     setinfo(dtrain, "weight", weights)
     
@@ -115,9 +102,6 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
       params = params,
       data = dtrain,
       nrounds = nrounds,
-      #lambda = 10,
-      #watchlist = watchlist,
-      #early_stopping_rounds = early_stopping_rounds,
       verbose = 0,
       obj = weighted_squared_error
     )
@@ -141,7 +125,127 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     #mu1.hat = predict(nuisance.model, newdata = dtest.1)
     return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
   }
-
+  else if(method == "gradient boosting early stopping"){
+    
+    data.full = data.frame(X, W - prop,Y)
+    train.index_1 <- createDataPartition(data.full$Y[train.index], p = 0.9, list = FALSE) # 90% training data
+    train.data <- data.full[train.index,][train.index_1, ]
+    val.data <- data.full[train.index,][-train.index_1, ]
+    test.data <- data.full[test.index,]
+    
+    num_cols <- ncol(data.full)
+    features = 1:(num_cols-2)
+    # Define the data matrices
+    dtrain = xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.data$Y)
+    dval = xgb.DMatrix(data = as.matrix(val.data[, features]), label = val.data$Y)
+    # Define the parameters
+    params = list(objective = "reg:squarederror", eval_metric = "rmse")
+    
+    #Watchlist to track performance on validation set
+    watchlist = list(train = dtrain, eval = dval)
+    
+    # Fit the model with early stopping
+    nrounds = 100  # Maximum number of boosting rounds
+    early_stopping_rounds =10  # Stop early if there is no improvement
+    
+    
+    nuisance.mu <- xgb.train(
+      #booster = "gblinear",
+      params = params,
+      data = dtrain,
+      nrounds = nrounds,
+      #lambda = 1,
+      watchlist = watchlist,
+      early_stopping_rounds = early_stopping_rounds,
+      verbose = 0
+    )
+    
+    
+    # Make predictions on the training and validation data
+    train.pred <- predict(nuisance.mu, newdata = dtrain)
+    val.pred <- predict(nuisance.mu, newdata = dval)
+    
+    # Calculate residuals for training and validation data
+    train.residual <- (train.data$Y - train.pred) / train.data[, num_cols-1] # train.data[, num_cols-1] could be zero
+    val.residual <- (val.data$Y - val.pred) / val.data[, num_cols-1]
+    
+    
+    dtest = xgb.DMatrix(data = as.matrix(test.data[,features]))
+    
+    
+    # Define the data matrices
+    dtrain <- xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.residual)
+    dval <- xgb.DMatrix(data = as.matrix(val.data[, features]), label = val.residual)
+    
+    watchlist = list(train = dtrain, eval = dval)
+    weights <- abs(train.data[, num_cols-1])**2
+    setinfo(dtrain, "weight", weights)
+    
+    weighted_squared_error <- function(preds, dtrain) {
+      labels <- getinfo(dtrain, "label")
+      weights <- getinfo(dtrain, "weight")
+      
+      # Calculate the gradient and hessian
+      grad <- weights * (preds - labels)
+      hess <- weights
+      
+      return(list(grad = grad, hess = hess))
+    }
+    
+    # Define the parameters for the second model
+    params <- list(eval_metric = "rmse")
+    
+    # Fit the second model with early stopping
+    nuisance.tau <- xgb.train(
+      #booster = "gblinear",
+      params = params,
+      data = dtrain,
+      nrounds = nrounds,
+      #lambda = 1,
+      watchlist = watchlist,
+      early_stopping_rounds = early_stopping_rounds,
+      verbose = 0,
+      obj = weighted_squared_error
+    )
+    
+    
+    #dtest.0 = xgb.DMatrix(data = as.matrix(data.0[test.index, -1]))
+    #dtest.1 = xgb.DMatrix(data = as.matrix(data.1[test.index, -1]))
+    
+    # Define the data matrix for the test data
+    dtest <- xgb.DMatrix(data = as.matrix(test.data[, 1:(num_cols-2)]))
+    
+    # Make predictions for the test data using the first and second models
+    mu.hat <- predict(nuisance.mu, newdata = dtest)
+    tau.hat <- predict(nuisance.tau, newdata = dtest)
+    
+    # Calculate the final predictions for mu0.hat and mu1.hat
+    mu0.hat <- mu.hat - prop * tau.hat
+    mu1.hat <- mu0.hat + tau.hat
+    
+    #mu0.hat = predict(nuisance.model, newdata = dtest.0)
+    #mu1.hat = predict(nuisance.model, newdata = dtest.1)
+    return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
+  }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 }
 
 
@@ -168,12 +272,16 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     n0 = n * (1 - prop)
   }
   
-  IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) + tau.hat
-  
+
   if (stats == "plain") {
     # Absolute value of the plain difference in means
     # value = abs(sum(W * Y) / max(1, sum(W)) - sum((1 - W) * Y) / max(1, sum(1 - W)))
-    value = abs(sum(W * Y) / n1 - sum((1 - W) * Y) / n0)
+    #value = abs(sum(W * Y) / n1 - sum((1 - W) * Y) / n0)
+    
+    IF = W * (Y)/prop - (1 - W) * (Y)/(1-prop)
+    value =  abs(mean(IF)/sd(IF))
+    
+
   }else if (stats == "denoise") {
     # Absolute value of the difference in means with denoising using mu.hat
    #value = abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0)
@@ -188,18 +296,28 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     # Negative absolute difference between the difference in means with denoising using mu.hat and the estimated ATE
     value = -abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0 - mean(tau.hat))
   }else if(stats == "AIPW"){
-
+    
+    IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) + tau.hat
     value =  abs(mean(IF)/sd(IF))
+    #IF2 =  W * (Y - mu.hat)/prop - (1 - W) * (Y - mu.hat)/(1-prop)
+    #value2 =  abs(mean(IF2)/sd(IF2))
+    #value = max(value,value2)
     
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
+    
+    IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) + tau.hat
     value = mean(abs(IF))/sd(abs(IF))
     
   }else if(stats == "AIPW + ITE"){
     #value1  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat)) / sqrt(1 / n1 + 1 /n0)
     # value2 = - mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
    # value2 = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
+    
+    IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) 
     value = abs(mean(IF)/sd(IF)) + mean(abs(IF))/sd(abs(IF)) #value1 + value2 
+    
+    
   }
   
   # Return the computed statistic value
