@@ -8,7 +8,7 @@ BH.threshold = function(pval, q = 0.1){
   pval = sort(pval, decreasing = FALSE)
   
   # compute the threshold of the BH procedure
-  FDR.hat = m * pval/seq(1, m)
+  FDR.hat = m * pval / seq(1, m)
   pval.index = which(FDR.hat <= q)
   if(length(pval.index) == 0){return(-1e6)}
   threshold = pval[max(pval.index)]
