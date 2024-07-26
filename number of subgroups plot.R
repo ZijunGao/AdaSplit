@@ -44,7 +44,7 @@ ggplot(plot.data, aes(x = Group.number)) +
     x = "Number of subgroups",
     y = "FDR",
     color = "Method") +
-  scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +  # Custom y-axis breaks
+  scale_y_continuous(breaks = seq(0, 0.6, by = 0.2), limits = c(0, 0.6)) +  # Custom y-axis breaks
   scale_x_continuous(breaks = seq(16, 32, by = 4))+
   theme_bw() +
   theme(
