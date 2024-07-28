@@ -19,7 +19,7 @@ p = 0.5 # propensity score; 0.5, 0.2
 Group.level.number = c(4, 4) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta = rep(1, d); theta = rep(1, 2)
-delta = 1 # 1
+delta = 0.5 # 1
 sigma = 1 # error magnitude in generating Y(0); 1
 
 nuisance.learner.method = "gradient boosting" # "gradient boosting", "gradient boosting early
@@ -28,11 +28,11 @@ M = 100 # number of permutations; 400
 q = 0.2 # FDR level
 
 # setting
-setting = "unbalanced" # "balanced", "unbalanced"
+setting = "balanced" # "balanced", "unbalanced"
 if(setting == "unbalanced"){p = 0.2}
 
 start.time = proc.time() 
-m = 100 # number of trials
+m = 40 # number of trials
 record = list()
 record$pValue = list()
 record$pValue$ORT$denoise = record$pValue$ORT$denoise.normalized = record$pValue$ORT$AIPW = record$pValue$ORT$AIPW.normalized = matrix(0, nrow = m, ncol = Group.number)
@@ -54,11 +54,11 @@ for(i in 1:m){
   
   # potential outcomes
   # mu0 is linear in X and S
-  mu0 =  beta0 + X %*% beta + 2* X[, 1]^2 
+  mu0 =  (beta0 + X %*% beta + 2* X[, 1]^2) / 100 
   Y0 = mu0 + rnorm(n, 0, sigma)
   # tau is linear in S and independent of X
   #tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) * (1+ grepl("HTE", setting)* X %*% beta2) #  (S[, 1] >= 3) * (S[, 2] >= 3)
-  tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) * (1 + X[, 2]^2) #  (1+ X[, 2]^2)
+  tau = delta * (S[, 1] >= (Group.level.number[1]-1)) * (S[, 2] >= (Group.level.number[2] - 1)) # * (1 + X[, 2]^2) #  (1+ X[, 2]^2)
   tau.group = sapply(seq(1, Group.number), function(x) {
     mean(tau[Group == x])
   }) # average treatment effect in each group.
@@ -100,7 +100,7 @@ for(i in 1:m){
 
   record$pValue$ART.early.stopping$AIPW.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW normalized", M = M, nuisance.learner.method = "gradient boosting early stopping", B = B)$pval
 
-  # record$pValue$ART.early.stopping$denoise.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise normalized", M = M, nuisance.learner.method = "gradient boosting early stopping", B = B)$pval
+  record$pValue$ART.early.stopping$denoise.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise normalized", M = M, nuisance.learner.method = "gradient boosting early stopping", B = B)$pval
 
   if(i %% 10 == 0){print(i)}
 }

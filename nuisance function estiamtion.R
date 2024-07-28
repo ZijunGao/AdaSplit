@@ -27,7 +27,7 @@ for(j in 1 : length(p.seq)){
   W = rbinom(n, 1, p) # treatment assignment
   # potential outcomes
   # tau is linear in S and independent of X
-  tau = delta * (X[,1])^2
+  tau = delta * rep(1, n) # (X[,1])^2
   mu0 =  beta0 + X %*% beta + S %*% theta
   mu1 =  beta0 + X %*% beta + S %*% theta + tau
   mu = mu0 * (1 - p) + mu1 * p
@@ -47,10 +47,10 @@ for(j in 1 : length(p.seq)){
 }
 
 par(mfrow = c(2,2))
-plot(p.seq, apply(record$tau.R2, 2, mean), type = "l", main = "tau R2")
-plot(p.seq, apply(record$mu.R2, 2, mean), type = "l",main = "mu R2")
-plot(p.seq, apply(record$cor, 2, mean), type = "l",main = "cor")
-plot(p.seq, apply(record$ratio, 2, mean), type = "l",main = "error ratio")
+plot(p.seq, apply(record$tau.R2, 2, mean), xlab = "", ylab = "propensity score", type = "l", main = "tau R2")
+plot(p.seq, apply(record$mu.R2, 2, mean), xlab = "", ylab = "propensity score", type = "l",main = "mu R2")
+plot(p.seq, apply(record$cor, 2, mean), xlab = "", ylab = "propensity score", type = "l",main = "cor")
+plot(p.seq, apply(record$ratio, 2, mean), xlab = "", ylab = "propensity score", type = "l",main = "error ratio")
 
     
     
