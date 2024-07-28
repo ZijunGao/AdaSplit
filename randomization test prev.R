@@ -27,7 +27,7 @@ M = 400 # number of permutations
 q = 0.2 # FDR level
 
 # setting
-setting = "HTE3" # "default", "HTE", "HTE2", "HTE3", "HTE4", "misspecified"
+setting = "negatively correlated" # "default", "HTE", "HTE2", "HTE3", "HTE4", "misspecified", "independent", "positively correlated", "negatively correlated"
 
 start.time = proc.time() 
 m = 100 # number of trials
@@ -50,6 +50,7 @@ for(i in 1:m){
   # mu0 is linear in X and S
   Y0 = beta0 + X %*% beta + S %*% theta + rnorm(n, 0, sigma)
   # tau is linear in S and independent of X
+  tau = delta * (X[,1])^2 # default
   if(setting == "default"){
     tau = delta * rep(1, n)
   }else if(setting == "HTE"){
@@ -70,11 +71,18 @@ for(i in 1:m){
   
   # inference
   # true nuisance functions
-  # mu.hat = mu # mu
-  # tau.hat = tau 
-  # negatively correlated mu.hat, tau.hat
-  mu.hat = mu + rnorm(n, 0, 4) # mu
-  tau.hat = tau - (mu.hat - mu) # tau - (mu.hat - mu) / (1 - 2 * p) 
+  mu.hat = mu # mu
+  tau.hat = tau
+  if(setting == "negatively correlated"){
+    mu.hat = mu + rnorm(n, 0, 4)
+    tau.hat = tau - (mu.hat - mu)
+  }else if(setting == "positively correlated"){
+    mu.hat = mu + rnorm(n, 0, 4) 
+    tau.hat = tau + (mu.hat - mu)
+  }else if(setting == "independent"){
+    mu.hat = mu + rnorm(n, 0, 4) 
+    tau.hat = tau + rnorm(n, 0, 4) 
+  }
   mu1.hat = mu.hat + (1 - p) * tau.hat
   mu0.hat = mu.hat - p * tau.hat
   # AIPW
