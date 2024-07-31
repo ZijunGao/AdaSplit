@@ -24,9 +24,9 @@ f = function(t) {
 
 # Parameters
 a = 1; b = 10
-delta = 0.2
-pi0 = 0.3 # Proportion of null hypotheses
-q = 0.2  # FDR level
+delta = 0.3
+pi0 = 0.4 # Proportion of null hypotheses
+q = 0.5  # FDR level
 lambda = 0.5 
 C = 2
 
