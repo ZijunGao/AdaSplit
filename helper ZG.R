@@ -493,7 +493,7 @@ ART = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear
   }
   
   W.aug = cbind(W, W.knockoff)
-  W.tilde = apply(W.aug, 1, mean) # TODO more knockoffs
+  W.tilde = apply(W.aug, 1, mean)
   nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W.tilde, method = nuisance.learner.method, train.index = seq(1, n), test.index = seq(1, n))
   
   # Calculate test statistics for the original data

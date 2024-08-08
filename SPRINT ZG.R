@@ -39,7 +39,7 @@ colnames(one_hot_feature) <- paste("RACE", 1:4, sep="_")
 #index = (data[,"EVENT_PRIMARY"]==1)
 
 
-Y = ((data$T_PRIMARY + 0)*(1-data$EVENT_PRIMARY) + data$EVENT_PRIMARY * data$T_PRIMARY * 0) #data$T_PRIMARY*(1-data$EVENT_PRIMARY); + data$T_PRIMARY 
+Y = ((data$T_PRIMARY + 00)*(1-data$EVENT_PRIMARY) + data$EVENT_PRIMARY * data$T_PRIMARY * 0) #data$T_PRIMARY*(1-data$EVENT_PRIMARY); + data$T_PRIMARY 
 #(data$T_PRIMARY>800)*data$T_PRIMARY #*(1-data$EVENT_PRIMARY) # ((data$T_PRIMARY + 500) *(1-data$EVENT_PRIMARY) + data$EVENT_PRIMARY * data$T_PRIMARY)
 
 #Y = log(Y+0.000001)
@@ -267,8 +267,8 @@ p1 <- ggplot(df1, aes(Var2, Var1, fill = value)) +
   ) +
   theme_minimal() +
   theme(
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
+    # axis.text = element_blank(),
+    # axis.ticks = element_blank(),
     axis.title = element_text(size = 16),
     plot.title = element_text(size = 16, hjust = 0.5),
     legend.position = "none"
@@ -300,7 +300,7 @@ p2<-ggplot(df, aes(x = Index, y = P_Value)) +
   geom_point(aes(color = Color), size = 4) +  # Use color based on the new column
   scale_color_identity() +  # Use colors specified in the Color column without a legend
   labs(
-    title = expression("BH + Storey (" ~ hat(pi)[0] ~ "= 0.72)"),
+    title = expression("BH + Storey (" ~ hat(pi)[0] ~ "= )"),
     x = "Index",
     y = "Sorted P-value"
   ) +
@@ -373,8 +373,8 @@ p1 <- ggplot(df2, aes(Var2, Var1, fill = value)) +
   ) +
   theme_minimal() +
   theme(
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
+    # axis.text = element_blank(),
+    # axis.ticks = element_blank(),
     axis.title = element_text(size = 16),
     plot.title = element_text(size = 16, hjust = 0.5),
     legend.position = "none"
@@ -405,7 +405,7 @@ p2<-ggplot(df, aes(x = Index, y = P_Value)) +
   geom_point(aes(color = Color), size = 4) +  # Use color based on the new column
   scale_color_identity() +  # Use colors specified in the Color column without a legend
   labs(
-    title = expression("BH + Storey (" ~ hat(pi)[0] ~ "= 0.48)"), #
+    title = expression("BH + Storey (" ~ hat(pi)[0] ~ "= )"), #
     x = "Index",
     y = "Sorted P-value"
   ) +
