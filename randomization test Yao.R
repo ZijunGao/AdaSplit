@@ -28,7 +28,7 @@ M = 200 # number of permutations; 400
 q = 0.10 # FDR level
 
 # setting
-setting = "unbalanced" # "balanced", "unbalanced"
+setting = "unbalanced"
 if(setting == "unbalanced"){p = 0.2}
 
 start.time = proc.time() 

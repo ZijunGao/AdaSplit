@@ -19,6 +19,7 @@ BH.threshold = function(pval, q = 0.1){
 # the larger the stats, the smaller the p-value
 # permutation.p.value(2, c(1,NA,3))
 permutation.p.value = function(stats, stats.ref, type = "two tailed"){
+  
   if(is.na(stats)){return(1)}
   if(type == "right tailed"){
     return((sum(stats <= stats.ref[!is.na(stats.ref)]) + 1) / (length(stats.ref[!is.na(stats.ref)]) + 1))
