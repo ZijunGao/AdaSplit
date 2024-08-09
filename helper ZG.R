@@ -283,7 +283,9 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
   }else if(stats == "AIPW"){
     # value = abs(sum(W * (Y - mu1.hat)) / max(1, sum(W)) - sum((1 - W) * (Y - mu0.hat)) / max(1, sum(1 - W)) + mean(tau.hat))
     # value  = abs(sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat)) # two-sided
-    value  = sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat) # one-sided
+    #value  = sum(W * (Y - mu1.hat)) / n1 - sum((1 - W) * (Y - mu0.hat)) / n0 + mean(tau.hat) # one-sided
+    IF = W * (Y - mu1.hat) / prop + mu1.hat - (1 - W) * (Y - mu0.hat) / (1-prop) - mu0.hat
+    value = mean(IF)
   }else if(stats == "AIPW normalized"){
     IF = W * (Y - mu1.hat) / prop + mu1.hat - (1 - W) * (Y - mu0.hat) / (1-prop) - mu0.hat
     # value = abs(mean(IF)) / sd(IF) # two-sided
