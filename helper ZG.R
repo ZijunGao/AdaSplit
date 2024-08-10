@@ -67,7 +67,7 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
   nrounds = 100 
   
   nuisance.mu <- xgb.train(
-    #booster = "gblinear",
+    # booster = "gblinear", # linear
     params = params,
     data = dtrain,
     nrounds = nrounds,
@@ -107,7 +107,7 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
   
   # Fit the second model with early stopping
   nuisance.tau <- xgb.train(
-    #booster = "gblinear",
+    # booster = "gblinear", # "linear"
     params = params,
     data = dtrain,
     nrounds = nrounds,
@@ -212,6 +212,91 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     #lambda = 1,
     watchlist = watchlist,
     early_stopping_rounds = early_stopping_rounds,
+    verbose = 0,
+    obj = weighted_squared_error
+  )
+  
+  
+  #dtest.0 = xgb.DMatrix(data = as.matrix(data.0[test.index, -1]))
+  #dtest.1 = xgb.DMatrix(data = as.matrix(data.1[test.index, -1]))
+  
+  # Define the data matrix for the test data
+  dtest <- xgb.DMatrix(data = as.matrix(test.data[, 1:(num_cols-2)]))
+  
+  # Make predictions for the test data using the first and second models
+  mu.hat <- predict(nuisance.mu, newdata = dtest)
+  tau.hat <- predict(nuisance.tau, newdata = dtest)
+  
+  # Calculate the final predictions for mu0.hat and mu1.hat
+  mu0.hat <- mu.hat - prop * tau.hat
+  mu1.hat <- mu0.hat + tau.hat
+  
+  #mu0.hat = predict(nuisance.model, newdata = dtest.0)
+  #mu1.hat = predict(nuisance.model, newdata = dtest.1)
+  return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
+}else if(method == "gradient boosting linear"){
+  
+  data.full = data.frame(X, W - prop,Y)
+  train.index_1 <- createDataPartition(data.full$Y[train.index], p = 0.9, list = FALSE) # 90% training data
+  train.data <- data.full[train.index,]
+  test.data <- data.full[test.index,]
+  
+  num_cols <- ncol(data.full)
+  features = 1:(num_cols-2)
+  # Define the data matrices
+  dtrain = xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.data$Y)
+  # Define the parameters
+  params = list(objective = "reg:squarederror", eval_metric = "rmse")
+  
+  
+  # Fit the model with early stopping
+  nrounds = 100 # 100
+  
+  nuisance.mu <- xgb.train(
+    booster = "gblinear", # linear
+    params = params,
+    data = dtrain,
+    nrounds = nrounds,
+    verbose = 0
+  )
+  
+  
+  # Make predictions on the training and validation data
+  train.pred <- predict(nuisance.mu, newdata = dtrain)
+  
+  # Calculate residuals for training and validation data
+  train.residual <- (train.data$Y - train.pred) / train.data[, num_cols-1] # train.data[, num_cols-1] could be zero
+  
+  dtest = xgb.DMatrix(data = as.matrix(test.data[,features]))
+  
+  
+  # Define the data matrices
+  dtrain <- xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.residual)
+  
+  
+  weights <- abs(train.data[, num_cols-1])**2
+  setinfo(dtrain, "weight", weights)
+  
+  weighted_squared_error <- function(preds, dtrain) {
+    labels <- getinfo(dtrain, "label")
+    weights <- getinfo(dtrain, "weight")
+    
+    # Calculate the gradient and hessian
+    grad <- weights * (preds - labels)
+    hess <- weights
+    
+    return(list(grad = grad, hess = hess))
+  }
+  
+  # Define the parameters for the second model
+  params <- list(eval_metric = "rmse")
+  
+  # Fit the second model with early stopping
+  nuisance.tau <- xgb.train(
+    booster = "gblinear", # "linear"
+    params = params,
+    data = dtrain,
+    nrounds = nrounds,
     verbose = 0,
     obj = weighted_squared_error
   )
@@ -504,6 +589,7 @@ ART = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear
   
   # Generate reference test statistics using permutations
   test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = W.aug[cbind(seq(1, n), replicate(n, sample(1 + B, 1)))], X = X, G = G, Group = Group, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
+  if(dim(test.stats.ref)[1] == 1){test.stats.ref = matrix(test.stats.ref, ncol = 1)}
   
   # Calculate p-values for each group
   pval = sapply(seq(1, length(test.stats.value)), function(x) {

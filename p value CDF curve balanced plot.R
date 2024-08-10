@@ -7,19 +7,17 @@ library(ggplot2)
 
 record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
 alpha.seq = c(seq(1,25)/1000, seq(1, 20) / 20)
-q = 0.2 # FDR level
-index = 11
 method = c("ORT", "ART (overfitting)", "ART")
 color_values <- c("AIPW normalized" = "#d62728",
                   "AIPW" = "#ff9896",
                   "denoise normalized" = "#1f77b4", 
                   "denoise" = "#aec7e8")
 for(i in 1 : (length(method))){
-  plot.data = data.frame(lapply(record$pValue[[i]], function(x){sapply(alpha.seq, function(y)(mean(x[, index] <= y)))}))
+  plot.data = data.frame(lapply(record$pValue[[i]], function(x){sapply(alpha.seq, function(y)(mean(x <= y)))}))
 plot.data$alpha = alpha.seq
 
   pdf(file = paste(plotDirectory, "/", setting, method[i], ".pdf", sep = ""), width = 3.8, height = 3.5)
-  line.width = 0.75
+  line.width = 2
   point.size = 0
   g = ggplot(plot.data, aes(x = alpha)) +
     geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +  # Add diagonal reference line

@@ -13,36 +13,36 @@ source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper ZG.R")
   # Works better for B small, since the error is proportional to \sqrt{B}.
   # Useful if the asymptotic power of the test with some test statistic is challenging to derive and the test statistic is a function of the moments of g(Z_i, Y_i, X_i), for some known function g.
 
-n = 100 # sample size is small because it is just for one group
+n = 200 # sample size is small because it is just for one group; # 100
 d = 5 # number of covariates
 p = 0.5 # propensity score; 0.5, 0.2
 Group.level.number = c(1) # number of levels per group
 Group.number = prod(Group.level.number) # total number of groups
 beta0 = 1; beta =rep(1,d); theta = rep(1, 2)
 delta = 0.5 # 1
-sigma = 1  # error magnitude in generating Y(0); 1
+sigma = 5  # error magnitude in generating Y(0); 1; 5
 
-nuisance.learner.method = "gradient boosting" # "gradient boosting", "gradient boosting early
-B = 6
-M = 200 # number of permutations; 400
+nuisance.learner.method = "gradient boosting linear" # "gradient boosting", "gradient boosting early stopping", "linear"
+B = 2
+M = 400 # number of permutations; 400
 q = 0.10 # FDR level
 
 # setting
-setting = "unbalanced"
+setting = "balanced"
 if(setting == "unbalanced"){p = 0.2}
 
 start.time = proc.time() 
-m = 200 # number of trials
+m = 400 # number of trials
 record = list()
 record$pValue = list()
 record$pValue$ORT$denoise = record$pValue$ORT$denoise.normalized = record$pValue$ORT$AIPW = record$pValue$ORT$AIPW.normalized = matrix(0, nrow = m, ncol = Group.number)
 record$pValue$ART.early.stopping = record$pValue$ART  = record$pValue$ORT
 
-# set.seed(318)
+set.seed(318)
 for(i in 1:m){
   
   # generate data
-  X = matrix(runif(n * d, -1, 1), nrow = n, ncol = d) # covariates
+  X = matrix(rnorm(n * d, 0, sigma), nrow = n, ncol = d) # covariates; matrix(rnorm(n * d, 0, sigma), nrow = n, ncol = d); matrix(runif(n * d, -1, 1), nrow = n, ncol = d)
   
   quantiles_1 <- quantile(c(-Inf,X[,d],Inf), probs = seq(0, 1, length.out = Group.level.number[1] + 1))
   #quantiles_2 <- quantile(c(-Inf,X[,d-2],Inf), probs = seq(0, 1, length.out = Group.level.number[2] + 1))
@@ -56,11 +56,12 @@ for(i in 1:m){
   # potential outcomes
   mu0 = (X %*% beta)
   Y0 = mu0
-  tau = 3  + 10* rnorm(n, 0, sigma)
+  tau = 1.5 + X[,1] + X[,2] # 3  + 10 * rnorm(n, 0, sigma); 2 + X[,1] + X[,2]; 1.5 + X[,1] + X[,2]
+  
   tau.group = sapply(seq(1, Group.number), function(x) {
     mean(tau[Group == x])
   }) # average treatment effect in each group.
-  Y1 = mu0 + tau 
+  Y1 = mu0 + tau
   Y = Y1 * W + Y0 * (1 - W) # observed outcome
   # nuisance functions
   mu1 = mu0 + tau
@@ -83,22 +84,22 @@ for(i in 1:m){
   
   # ART
   # gradient boosting, overfitting
-  # record$pValue$ART$AIPW[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
-  # 
-  # record$pValue$ART$denoise[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
-  # 
-  # record$pValue$ART$AIPW.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW normalized", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
-  # 
-  # record$pValue$ART$denoise.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise normalized", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
+  record$pValue$ART$AIPW[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
+
+  record$pValue$ART$denoise[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
+
+  record$pValue$ART$AIPW.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW normalized", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
+
+  record$pValue$ART$denoise.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise normalized", M = M, nuisance.learner.method = "gradient boosting", B = B)$pval
 
   # gradient boosting, early stopping
-  # record$pValue$ART.early.stopping$AIPW[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW", M = M, nuisance.learner.method = "gradient boosting early stopping", B = B)$pval
+  record$pValue$ART.early.stopping$AIPW[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW", M = M, nuisance.learner.method = nuisance.learner.method, B = B)$pval
 
-  #record$pValue$ART.early.stopping$denoise[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise", M = M, nuisance.learner.method = "gradient boosting early stopping", B = B)$pval
+  record$pValue$ART.early.stopping$denoise[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise", M = M, nuisance.learner.method = nuisance.learner.method, B = B)$pval
 
-  #record$pValue$ART.early.stopping$AIPW.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW normalized", M = M, nuisance.learner.method = "gradient boosting early stopping", B = B)$pval
+  record$pValue$ART.early.stopping$AIPW.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "AIPW normalized", M = M, nuisance.learner.method = nuisance.learner.method, B = B)$pval
 
-  #record$pValue$ART.early.stopping$denoise.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise normalized", M = M, nuisance.learner.method = "gradient boosting early stopping", B = B)$pval
+  record$pValue$ART.early.stopping$denoise.normalized[i,] = ART(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, test.stats.method = "denoise normalized", M = M, nuisance.learner.method = nuisance.learner.method, B = B)$pval
 
   if(i %% 10 == 0){print(i)}
 }
@@ -108,9 +109,9 @@ record$setting = setting
 index = Group.number - 0
 par(mfrow = c(1, 1))
 # lapply(record$pValue, hist)
-for(i in 1:1){
+for(i in seq(1, 3)){
   cdf.curve = data.frame(lapply(record$pValue[[i]], function(x){sapply(seq(1, 100)/100, function(y)(mean(x[, index] <= y)))}))
-  matplot(cdf.curve, main = names(record$pValue)[i], x = seq(1, 100)/100, xlab = "alpha", type = "l", lty = 1, col = seq(2, 5), ylim = c(0, 1)); legend("bottomright", colnames(cdf.curve), col = seq(2, 5), lty = 1); abline(a = 0, b = 1, lty = 3)
+  matplot(cdf.curve, main = names(record$pValue)[i], x = seq(1, 100)/100, xlab = "alpha", type = "l", lty = 1, col = seq(2, 5), ylim = c(0, 1)); legend("bottomright", colnames(cdf.curve), col = seq(2, 5), lty = 1, cex = 1); abline(a = 0, b = 1, lty = 3)
 }
 
 # distribution of randomization p-values
@@ -118,5 +119,5 @@ for(i in 1:1){
 # abline(v = pnorm(-sqrt(n)), "denoise.p.value") # pnorm(-sqrt(n)) could be too small to plot 
 
 
-# saveRDS(record, file.patht("~/Desktop/Research/Yao/HTE inference/code/Panning/0630", paste(setting, "rds", sep= ".")))
+# saveRDS(record, file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/0630", paste(setting, "rds", sep= ".")))
 
