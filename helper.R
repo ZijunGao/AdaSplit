@@ -1,4 +1,12 @@
 # helper functions for panning
+
+# Changes: Aug. 14
+  # Replace mu.hat by mu in "gradient boosting early stopping"
+  # Added sample splitting proportion rho (nuisance proportion) in function SS
+  # replaced prop by rep(prop, n)
+  # replaced prop by W.tilde for test statistic computation in ART
+  # ? true tau and mu
+
 library("xgboost")
 library(caret)
 # BH
@@ -26,6 +34,7 @@ permutation.p.value = function(stats, stats.ref){
 # nuisance learner
 nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method = "linear", train.index = NULL, test.index = NULL, ...){
   n = length(Y)
+  if(length(prop) == 1){prop = rep(prop, n)}
 
   if(method == "linear"){
     data.train = data.frame(Y, X, G, W - prop, (W-prop) * X, (W-prop) * G)
@@ -34,7 +43,7 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     nuisance.model = lm(Y ~ ., data = data.train[train.index,])
     mu0.hat = predict(nuisance.model, newdata = data.0[test.index, ])
     mu1.hat = predict(nuisance.model, newdata = data.1[test.index, ])
-    mu.hat = mu0.hat * (1 - prop) + mu1.hat * prop
+    mu.hat = mu0.hat * (1 - prop[test.index]) + mu1.hat * prop[test.index]
     tau.hat = mu1.hat -  mu0.hat
     
     return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat)) 
@@ -118,7 +127,7 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     tau.hat <- predict(nuisance.tau, newdata = dtest)
     
     # Calculate the final predictions for mu0.hat and mu1.hat
-    mu0.hat <- mu.hat - prop * tau.hat
+    mu0.hat <- mu.hat - prop[test.index] * tau.hat
     mu1.hat <- mu0.hat + tau.hat
     
     #mu0.hat = predict(nuisance.model, newdata = dtest.0)
@@ -162,8 +171,12 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     
     
     # Make predictions on the training and validation data
-    train.pred <- predict(nuisance.mu, newdata = dtrain)
-    val.pred <- predict(nuisance.mu, newdata = dval)
+    # train.pred <- predict(nuisance.mu, newdata = dtrain)
+    # val.pred <- predict(nuisance.mu, newdata = dval)
+    # to be deleted start
+    train.pred = mu[train.index][train.index_1]
+    val.pred = mu[train.index][-train.index_1]
+    # to be deleted end
     
     # Calculate residuals for training and validation data
     train.residual <- (train.data$Y - train.pred) / train.data[, num_cols-1] # train.data[, num_cols-1] could be zero
@@ -216,35 +229,123 @@ nuisance.learner = function(Y, X = NULL, prop = NULL, G = NULL, W = NULL, method
     dtest <- xgb.DMatrix(data = as.matrix(test.data[, 1:(num_cols-2)]))
     
     # Make predictions for the test data using the first and second models
-    mu.hat <- predict(nuisance.mu, newdata = dtest)
+    # mu.hat <- predict(nuisance.mu, newdata = dtest)
+    mu.hat = mu[test.index]  # to be deleted
     tau.hat <- predict(nuisance.tau, newdata = dtest)
     
     # Calculate the final predictions for mu0.hat and mu1.hat
-    mu0.hat <- mu.hat - prop * tau.hat
+    mu0.hat <- mu.hat - prop[test.index] * tau.hat
     mu1.hat <- mu0.hat + tau.hat
     
     #mu0.hat = predict(nuisance.model, newdata = dtest.0)
     #mu1.hat = predict(nuisance.model, newdata = dtest.1)
     return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
+  }else if(method == "gradient boosting linear"){
+    
+    data.full = data.frame(X, W - prop,Y)
+    train.index_1 <- createDataPartition(data.full$Y[train.index], p = 0.9, list = FALSE) # 90% training data
+    train.data <- data.full[train.index,][train.index_1, ]
+    val.data <- data.full[train.index,][-train.index_1, ]
+    test.data <- data.full[test.index,]
+    
+    num_cols <- ncol(data.full)
+    features = 1:(num_cols-2)
+    # Define the data matrices
+    dtrain = xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.data$Y)
+    dval = xgb.DMatrix(data = as.matrix(val.data[, features]), label = val.data$Y)
+    # Define the parameters
+    params = list(objective = "reg:squarederror", eval_metric = "rmse")
+    
+    #Watchlist to track performance on validation set
+    watchlist = list(train = dtrain, eval = dval)
+    
+    # Fit the model with early stopping
+    nrounds = 100  # Maximum number of boosting rounds
+
+    
+    nuisance.mu <- xgb.train(
+      booster = "gblinear",
+      params = params,
+      data = dtrain,
+      nrounds = nrounds,
+      #lambda = 1,
+      watchlist = watchlist,
+      # early_stopping_rounds = early_stopping_rounds,
+      verbose = 0
+    )
+    
+    
+    # Make predictions on the training and validation data
+    # train.pred <- predict(nuisance.mu, newdata = dtrain)
+    # val.pred <- predict(nuisance.mu, newdata = dval)
+    # to be deleted start
+    train.pred = mu[train.index][train.index_1]
+    val.pred = mu[train.index][-train.index_1]
+    # to be deleted end
+    
+    # Calculate residuals for training and validation data
+    train.residual <- (train.data$Y - train.pred) / train.data[, num_cols-1] # train.data[, num_cols-1] could be zero
+    val.residual <- (val.data$Y - val.pred) / val.data[, num_cols-1]
+    
+    
+    dtest = xgb.DMatrix(data = as.matrix(test.data[,features]))
+    
+    
+    # Define the data matrices
+    dtrain <- xgb.DMatrix(data = as.matrix(train.data[, features]), label = train.residual)
+    dval <- xgb.DMatrix(data = as.matrix(val.data[, features]), label = val.residual)
+    
+    watchlist = list(train = dtrain, eval = dval)
+    weights <- abs(train.data[, num_cols-1])**2
+    setinfo(dtrain, "weight", weights)
+    
+    weighted_squared_error <- function(preds, dtrain) {
+      labels <- getinfo(dtrain, "label")
+      weights <- getinfo(dtrain, "weight")
+      
+      # Calculate the gradient and hessian
+      grad <- weights * (preds - labels)
+      hess <- weights
+      
+      return(list(grad = grad, hess = hess))
+    }
+    
+    # Define the parameters for the second model
+    params <- list(eval_metric = "rmse")
+    
+    # Fit the second model with early stopping
+    nuisance.tau <- xgb.train(
+      booster = "gblinear",
+      params = params,
+      data = dtrain,
+      nrounds = nrounds,
+      #lambda = 1,
+      watchlist = watchlist,
+      # early_stopping_rounds = early_stopping_rounds,
+      verbose = 0,
+      obj = weighted_squared_error
+    )
+    
+    
+    #dtest.0 = xgb.DMatrix(data = as.matrix(data.0[test.index, -1]))
+    #dtest.1 = xgb.DMatrix(data = as.matrix(data.1[test.index, -1]))
+    
+    # Define the data matrix for the test data
+    dtest <- xgb.DMatrix(data = as.matrix(test.data[, 1:(num_cols-2)]))
+    
+    # Make predictions for the test data using the first and second models
+    # mu.hat <- predict(nuisance.mu, newdata = dtest)
+    mu.hat = mu[test.index]  # to be deleted
+    tau.hat <- predict(nuisance.tau, newdata = dtest)
+    
+    # Calculate the final predictions for mu0.hat and mu1.hat
+    mu0.hat <- mu.hat - prop[test.index] * tau.hat
+    mu1.hat <- mu0.hat + tau.hat # 
+    
+    #mu0.hat = predict(nuisance.model, newdata = dtest.0)
+    #mu1.hat = predict(nuisance.model, newdata = dtest.1)
+    return(result = list(mu0.hat = mu0.hat, mu1.hat = mu1.hat, mu.hat = mu.hat, tau.hat = tau.hat,tau=nuisance.tau)) 
   }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
   
 }
 
@@ -282,7 +383,7 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     value =  abs(mean(IF)/sd(IF))
     
 
-  }else if (stats == "denoise") {
+  }else if (stats == "denoise" | stats == "denoise normalized") {
     # Absolute value of the difference in means with denoising using mu.hat
    #value = abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0)
     
@@ -295,14 +396,12 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
   }else if (stats == "denoise + ATE") {
     # Negative absolute difference between the difference in means with denoising using mu.hat and the estimated ATE
     value = -abs(sum(W * (Y - mu.hat)) / n1 - sum((1 - W) * (Y - mu.hat)) / n0 - mean(tau.hat))
-  }else if(stats == "AIPW"){
-    
-    IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) + tau.hat
+  }else if(stats == "AIPW" | stats == "AIPW normalized"){
+    IF = W * (Y - mu1.hat)/(prop + (prop == 0)) - (1 - W) * (Y - mu0.hat)/(1-prop + (prop == 1)) + tau.hat
     value =  abs(mean(IF)/sd(IF))
     #IF2 =  W * (Y - mu.hat)/prop - (1 - W) * (Y - mu.hat)/(1-prop)
     #value2 =  abs(mean(IF2)/sd(IF2))
     #value = max(value,value2)
-    
   }else if (stats == "ITE") {
     # Average absolute difference between the outcome and the estimated nuisance function
     
@@ -331,11 +430,11 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
 test.stats.group = function(Y, W, X = NULL, G = NULL, Group, stats = "denoise", prop = NULL, mu0.hat = NULL, mu1.hat = NULL, mu.hat = NULL, tau.hat = NULL) {
   # Get the unique levels of the grouping variable
   Group.level = sort(unique(Group))
-  
+  if(length(prop) == 1){prop = rep(prop, length(Y))}
   # Compute the test statistic value for each group level
   values = sapply(Group.level, function(x) {
     index = which(Group == x)
-    test.stats(Y = Y[index], W = W[index], X = X[index,], G = G[index,], stats = stats, prop = prop, mu0.hat = mu0.hat[index], mu1.hat = mu1.hat[index], mu.hat = mu.hat[index], tau.hat = tau.hat[index])
+    test.stats(Y = Y[index], W = W[index], X = X[index,], G = G[index,], stats = stats, prop = prop[index], mu0.hat = mu0.hat[index], mu1.hat = mu1.hat[index], mu.hat = mu.hat[index], tau.hat = tau.hat[index])
   })
   
   # Return the computed values for each group level
@@ -354,6 +453,9 @@ ORT = function(Y, W, X, G, Group, prop = NULL, mu0, mu1, mu, tau, test.stats.met
   
   # Get the number of observations
   n = length(Y)
+  
+  # create prop vector
+  if(length(prop) == 1){prop = rep(prop, n)}
   
   # Calculate test statistics for the original data
   test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = prop, mu0.hat = mu0, mu1.hat = mu1, mu.hat = mu, tau.hat = tau)
@@ -433,7 +535,7 @@ DD = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear"
   # Example:
   # set.seed(318)
   # SS(Y = Y, W = W, X = X, G = G, Group = Group, prop = p, M = 100, test.stats.method = "denoise")$pval
-SS = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10){
+SS = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear", test.stats.method = "denoise", treatment.assignment = "Bernoulli", M = 10, rho = 0.5){
   # Convert X and G to matrix format
   X = as.matrix(X)
   G = as.matrix(G)
@@ -441,17 +543,23 @@ SS = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear"
   # Get the number of observations
   n = length(Y)
   
+  # create prop vector
+  if(length(prop) == 1){prop = rep(prop, n)}
+
+  
   # Estimate the nuisance functions
-  nuisance.index = sample(n, n * 0.5) # TODO 
+  nuisance.index = sample(n, n * rho) # TODO 
   train.index = nuisance.index; test.index = setdiff(seq(1, n), nuisance.index)
-  nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W, method = nuisance.learner.method, train.index = train.index, test.index = test.index)
+  nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W, method = nuisance.learner.method, train.index = train.index, test.index = test.index) # here!!!
   
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y[test.index], W = W[test.index], X = X[test.index,], Group = Group[test.index], G = G[test.index,], stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
+  # test.stats.value = test.stats.group(Y = Y[test.index], W = W[test.index], X = X[test.index,], Group = Group[test.index], G = G[test.index,], stats = test.stats.method, prop = prop[test.index], mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
+  test.stats.value = test.stats.group(Y = Y[test.index], W = W[test.index], X = X[test.index,], Group = Group[test.index], G = G[test.index,], stats = test.stats.method, prop = prop[test.index], mu0.hat = mu0[test.index], mu1.hat = mu1[test.index], mu.hat = mu[test.index], tau.hat = tau[test.index])
   
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y[test.index], W = rbinom(length(test.index), 1, prop), X = X[test.index,], G = G[test.index,], Group = Group[test.index], stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
-
+  # test.stats.ref = t(replicate(M, test.stats.group(Y = Y[test.index], W = rbinom(length(test.index), 1, prop), X = X[test.index,], G = G[test.index,], Group = Group[test.index], stats = test.stats.method, prop = prop[test.index], mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y[test.index], W = rbinom(length(test.index), 1, prop), X = X[test.index,], G = G[test.index,], Group = Group[test.index], stats = test.stats.method, prop = prop[test.index], mu0.hat = mu0[test.index], mu1.hat = mu1[test.index], mu.hat = mu[test.index], tau.hat = tau[test.index]))) #   Each column represents a group 
+  
   # Calculate p-values for each group
   pval = sapply(seq(1, length(test.stats.value)), function(x) {
     permutation.p.value(stats = test.stats.value[x], stats.ref = test.stats.ref[, x])
@@ -473,6 +581,10 @@ DD = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear"
   
   # Get the number of observations
   n = length(Y)
+  
+  # create prop vector
+  if(length(prop) == 1){prop = rep(prop, n)}
+  
   
   # Estimate the nuisance functions
   nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W, method = nuisance.learner.method, train.index = seq(1, n), test.index = seq(1, n))
@@ -505,23 +617,29 @@ ART = function(Y, W, X, G, Group, prop = NULL, nuisance.learner.method = "linear
   # Get the number of observations
   n = length(Y)
   
+  # create prop vector
+  if(length(prop) == 1){prop = rep(prop, n)}
+  
+  
   # Estimate the nuisance functions
   if (is.null(prop)){
     W.knockoff = permute_within_groups(W, Group, B)
   }else{
-    W.knockoff = matrix(rbinom(n * B, 1, p), ncol = B) 
+    W.knockoff = matrix(rbinom(n * B, 1, prop), ncol = B) 
   }
   
   W.aug = cbind(W, W.knockoff)
   W.tilde = apply(W.aug, 1, mean) # TODO more knockoffs
+
   nuisance.hat = nuisance.learner(Y = Y, X = X, prop = prop, G = G, W = W.tilde, method = nuisance.learner.method, train.index = seq(1, n), test.index = seq(1, n))
   
   # Calculate test statistics for the original data
-  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat)
+  # test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = W.tilde, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat) # prop changed to W.tilde
+  test.stats.value = test.stats.group(Y = Y, W = W, X = X, Group = Group, G = G, stats = test.stats.method, prop = W.tilde, mu0.hat =  mu0, mu1.hat = mu1, mu.hat = mu, tau.hat = tau) # prop changed to W.tilde
   
   # Generate reference test statistics using permutations
-  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = W.aug[cbind(seq(1, n), replicate(n, sample(1 + B, 1)))], X = X, G = G, Group = Group, stats = test.stats.method, prop = prop, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group 
-
+  # test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = W.aug[cbind(seq(1, n), replicate(n, sample(1 + B, 1)))], X = X, G = G, Group = Group, stats = test.stats.method, prop = W.tilde, mu0.hat = nuisance.hat$mu0.hat, mu1.hat = nuisance.hat$mu1.hat, mu.hat = nuisance.hat$mu.hat, tau.hat = nuisance.hat$tau.hat))) #   Each column represents a group; # prop changed to W.tilde
+  test.stats.ref = t(replicate(M, test.stats.group(Y = Y, W = W.aug[cbind(seq(1, n), replicate(n, sample(1 + B, 1)))], X = X, G = G, Group = Group, stats = test.stats.method, prop = W.tilde, mu0.hat = mu0, mu1.hat = mu1, mu.hat = mu, tau.hat = tau))) #   Each column represents a group; # prop changed to W.tilde
     # Calculate p-values for each group
     pval = sapply(seq(1, length(test.stats.value)), function(x) {
       permutation.p.value(stats = test.stats.value[x], stats.ref = test.stats.ref[, x])
