@@ -281,7 +281,7 @@ at_positions <- rep(1:Group.number, each = 2) * group_spacing + c(-0.5, 0.5)
 boxplot(value ~ Method + variable, data = combined_p_values_long, 
         at = at_positions, col = c("lightblue", "grey"), notch = TRUE, xaxt = "n",
         ylab = "P-values", xlab = "", # Remove the x-axis label
-        main = paste0("Comparison of ART and SSRT (Inference fold: ", ratio*100, "%)"),
+        main = paste0("Comparison of ART and SSRT (Inference fold: ", proportion*100, "%)"),
         cex.axis = 1.5, 
         cex.lab = 1.5,   
         cex.main = 1.6)   
