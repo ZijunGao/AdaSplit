@@ -82,20 +82,20 @@ Entropy_matrix <- function(Ex, m_max) {
   return(entropy_matrix)
 }
 
-Find_interpolation_indices <- function(ratio_row, proportion) {
+Find_interpolation_indices <- function(entropy_row, proportion) {
   
-  # ratio_row: a row in the entropy matrix above
+  # entropy_row: a row in the entropy matrix above
   # proportion: user-specified proportion of entropy for inference
   # Return the positions of the entropy right below and after the desire entropy (%)
   
-  idx_before <- max(which(ratio_row >= proportion))
+  idx_before <- max(which(entropy_row >= proportion))
   idx_after <- idx_before + 1
   
   return(list(m_j1 = idx_before, m_j2 = idx_after))
 }
 
 
-Compute_interpolation_ratio <- function(value1, value2, proportion) {
+Compute_interpolation_entropy <- function(value1, value2, proportion) {
   
   # value1, value2 are the entropy at positive m_j1 and m_j2
   # Return a probability for randomization to achieve the entropy proportion
@@ -128,7 +128,7 @@ Compute_policy_matrix <- function(entropy_matrix, proportion) {
     value2 <- entropy_matrix[j, m_j2]
 
     # Compute r_j for the interpolation
-    r_j <- Compute_interpolation_ratio(value1, value2, proportion)
+    r_j <- Compute_interpolation_entropy(value1, value2, proportion)
 
     # Update Policy_matrix
     Policy_matrix[j, m_j1] <- r_j
