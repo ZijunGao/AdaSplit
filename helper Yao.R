@@ -171,12 +171,17 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   # estimate the prob. of z given x and y
   train.treated.index = intersect(train.index,treated.index) 
-  mean.treated = mean(res.val[train.treated.index]) # treated mean
-  std.treated = std(res.val[train.treated.index]) # treated std
+  train.treated.z = rep(0,n)
+  train.treated.z[train.treated.index] = 1 
+  mean.treated = mean(train.treated.z[train.index]*res.val[train.index]/Ex[train.index]) 
+  std.treated = mean(train.treated.z[train.index]*(res.val[train.index]-mean.treated)**2/Ex[train.index])
   
-  train.control.index = intersect(train.index,control.index)
-  mean.control = mean(res.val[train.control.index]) # control mean
-  std.control = std(res.val[train.control.index]) # treated std
+  train.control.index = intersect(train.index,control.index) 
+  train.control.z = rep(0,n)
+  train.control.z[train.control.index] = 1 
+  mean.control = mean(train.control.z[train.index]*res.val[train.index]/(1-Ex[train.index])) 
+  std.control = mean(train.control.z[train.index]*(res.val[train.index]-mean.control)**2/(1-Ex[train.index])) 
+  
   
   p.zxy.1 = Ex*dnorm((R - (1-Ex)*tau.hat - mean.treated)/std.treated)
   p.zxy.0 = (1-Ex)*dnorm((R - (0-Ex)*tau.hat - mean.control)/std.control)
@@ -282,15 +287,21 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     train.index = c(train.index,idx_min)
     test.index = setdiff(1:n,train.index)
     
-
     #update the distribution of z given x and y
-    train.treated.index = intersect(train.index,treated.index)
-    mean.treated = mean(res.val[train.treated.index])
-    std.treated = std(res.val[train.treated.index])
-  
-    train.control.index = intersect(train.index,control.index)
-    mean.control = mean(res.val[train.control.index])
-    std.control = std(res.val[train.control.index])
+    train.treated.index = intersect(train.index,treated.index) 
+    train.treated.z = rep(0,n)
+    train.treated.z[train.treated.index] = 1 
+    mean.treated = mean(train.treated.z[train.index]*res.val[train.index]/Ex[train.index]) 
+    std.treated = mean(train.treated.z[train.index]*(res.val[train.index]-mean.treated)**2/Ex[train.index])
+    
+    train.control.index = intersect(train.index,control.index) 
+    train.control.z = rep(0,n)
+    train.control.z[train.control.index] = 1 
+    mean.control = mean(train.control.z[train.index]*res.val[train.index]/(1-Ex[train.index])) 
+    std.control = mean(train.control.z[train.index]*(res.val[train.index]-mean.control)**2/(1-Ex[train.index])) 
+    
+    
+    
 
     p.zxy.1 = Ex*dnorm((R - (1-Ex)*tau.hat - mean.treated)/std.treated)
     p.zxy.0 = (1-Ex)*dnorm((R - (0-Ex)*tau.hat - mean.control)/std.control)
