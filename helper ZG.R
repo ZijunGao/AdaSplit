@@ -386,6 +386,11 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     # value2 = - mean(abs(W * (Y - mu1.hat) + (1 - W) * (Y - mu0.hat)))
     value2 = mean(abs((W * (Y - mu1.hat)) - (1 - W) * (Y - mu0.hat) + tau.hat)) 
     value = value1 + value2 
+  }else if(stats == "fusion"){
+    IF = W * (Y - mu.hat) / prop - (1 - W) * (Y - mu.hat) / (1-prop)
+    IF.AIPW = W * (Y - mu1.hat) / prop + mu1.hat - (1 - W) * (Y - mu0.hat) / (1-prop) - mu0.hat
+    # value = abs(mean(IF)) / sd(IF.AIPW) # two-sided
+    value = mean(IF) / sd(IF.AIPW) # one-sided
   }
   
   # Return the computed statistic value
