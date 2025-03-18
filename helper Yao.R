@@ -179,7 +179,8 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   Q = Posterior(train.index, tau, X, R, W, Ex)
   #beta.imputed = Posterior_fit(train.index, inv_XTWX, XTWR, X, R, W, Ex, Q, PW)
-  Rsqr.imputed = Q[[1]]*(R / (0 - Ex))**2 + Q[[2]]*(R / (1 - Ex))**2
+  R.imputed = Q[[1]]*(R / (0 - Ex)) + Q[[2]]*(R / (1 - Ex))
+  Rsqr.imputed = Q[[1]]*(R / (0 - Ex)-R.imputed)**2 + Q[[2]]*(R / (1 - Ex)-R.imputed)**2
   
   active.sampling = function(){
     
@@ -236,7 +237,8 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       train.index = c(train.index, new)
       
       Q = Posterior(train.index, tau, X, R, W, Ex)
-      Rsqr.imputed = Q[[1]]*(R / (0 - Ex))**2 + Q[[2]]*(R / (1 - Ex))**2
+      R.imputed = Q[[1]]*(R / (0 - Ex)) + Q[[2]]*(R / (1 - Ex))
+      Rsqr.imputed = Q[[1]]*(R / (0 - Ex)-R.imputed)**2 + Q[[2]]*(R / (1 - Ex)-R.imputed)**2
       
       # compute the parameter change due to the new data point
       loss = sum((beta - beta.copy)**2)/sum((beta.copy)**2)
