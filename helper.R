@@ -415,8 +415,6 @@ test.stats = function(Y, W, X = NULL, G = NULL, stats = "denoise", prop = NULL, 
     
     IF = W * (Y - mu1.hat)/prop - (1 - W) * (Y - mu0.hat)/(1-prop) 
     value = abs(mean(IF)/sd(IF)) + mean(abs(IF))/sd(abs(IF)) #value1 + value2 
-    
-    
   }
   
   # Return the computed statistic value
