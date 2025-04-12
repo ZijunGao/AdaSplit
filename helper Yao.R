@@ -7,268 +7,254 @@ library(pracma)
 library(Matrix)
 
 
-nuisance.mu = function(Y= NULL, X = NULL){
-  
-  # Estimate the expectation of Y given X using xgboost
-  
-  params = list(objective = "reg:squarederror", eval_metric = "rmse",eta=0.1)
-  nfold = 10
-  nrounds = 1000
-  early_stopping_rounds = 10
-  
-  nuisance.mu <- xgb.cv(
-    data = xgb.DMatrix(data = X, label = Y),
-    params = params, 
-    nfold = nfold,
-    nrounds = nrounds,
-    early_stopping_rounds = early_stopping_rounds,
-    verbose = FALSE,
-    callbacks = list(cb.cv.predict(save_models = TRUE))
-  )
-  
-  nuisance.mu$pred
-  
-}
-
-
-
-
-
-
-inv_update = function(inv_x, w, x, sign){
-  
-  # Sherman–Morrison–Woodbury update of inversion
-
-  
-  u <- sqrt(w) * c(1,x)
-  inv_u = inv_x %*% u
-  inv_update = inv_x - sign * (inv_u %*% t(inv_u)) / (1 + sign * t(u) %*% inv_u)[1]
-  return(inv_update)
-}
-
-xr_update = function(xtwr, w, r, x, sign){
-  
-  # Projection update
-  
-  return(xtwr + sign* w * r *  c(1,x))
-}
-
-
-
-
-nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, train.index = NULL, ...){
+nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, train.index = NULL, k=20,...){
   
   # initial fit
   n = length(Y)
   R = Y - mu
-  PW = rep(1,n)
+  A = knn.indices(X,k) 
   X_ = cbind(1, X[train.index,])
   R_ = (R/ (W-Ex))[train.index]
   W_ = diag(c(((W-Ex)**2)[train.index]))
-  inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-4*diag(rep(1.0,dim(X_)[2])))
-  XTWR = t(X_) %*% W_ %*% R_
-  beta = inv_XTWX %*% XTWR
-  tau = cbind(1, X) %*% beta
-  
-  #Q = Posterior(train.index, tau, X, R, W, Ex)
-  #beta.imputed = Posterior_fit(train.index, inv_XTWX, XTWR, X, R, W, Ex, Q, PW)
-  #tau.imputed = cbind(1, X) %*% beta.imputed
-  
-  mu0.hat <- mu - Ex * tau
-  mu1.hat <- mu0.hat + tau
-  
-  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau))
-}
-
-
-  
-Posterior = function(train.index, tau, X, R, W, Ex){
-  
-  # generate leave-one-out residual
-  n = length(Ex) 
-  res <-  rep(0,n)
-
-  treated.index = which(W > 0.5) # treated units
-  control.index = which(W < 0.5) # control units
-  
-  for (i in train.index){
-    res[i] = R[i] - (W[i]-Ex[i])*tau[i] 
-  }
-  
-  train.treated.z = rep(0,n)
-  train.treated.z[intersect(train.index,treated.index)] = 1 
-  mean.treated = mean(train.treated.z[train.index]*res[train.index]/Ex[train.index]) 
-  std.treated = mean(train.treated.z[train.index]*(res[train.index]-mean.treated)**2/Ex[train.index])
-
-  train.control.z = rep(0,n)
-  train.control.z[intersect(train.index,control.index)] = 1 
-  mean.control = mean(train.control.z[train.index]*res[train.index]/(1-Ex[train.index])) 
-  std.control = mean(train.control.z[train.index]*(res[train.index]-mean.control)**2/(1-Ex[train.index])) 
-  
-  p.zxy.1 = Ex*dnorm((R - (1-Ex)*tau - mean.treated)/std.treated)
-  p.zxy.0 = (1-Ex)*dnorm((R - (0-Ex)*tau - mean.control)/std.control)
-  p.zxy = p.zxy.1 + p.zxy.0
-  p.zxy.1 = (p.zxy.1)/p.zxy # prob. of z = 1 given x and y
-  p.zxy.0 = (p.zxy.0)/p.zxy # prob. of z = 0 given x and y
-  
-  return(list(p.zxy.0, p.zxy.1))
-}  
-
-
-Posterior_fit = function(train.index, inv_XTWX, XTWR, X, R, W, Ex, Q, PW){
-  
-  p.zxy.0 = Q[[1]]; p.zxy.1 = Q[[2]]
-  test.index = setdiff(1:n,train.index)
-
-  W1 = (1 - Ex)**2/PW
-  W2 = Ex**2/PW
-  
-  XX <- cbind(1, rbind(X,X))
-  W1_ = W1; W2_ = W2
-  
-  W1_[train.index] = W[train.index] * W1[train.index]
-  W1_[test.index] = p.zxy.1[test.index] * W1[test.index]
-  
-  W2_[train.index] = (1-W[train.index]) * W2[train.index]
-  W2_[test.index] = p.zxy.0[test.index] * W2[test.index]
-  
-  inv_XTWX_ = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-4*diag(rep(1.0,dim(XX)[2])))
-  beta = inv_XTWX_ %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex), R/(0 - Ex))
-  return(beta)
-}
-
-
-
-
-nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, max_proportion = NULL,...){
-  
-  
-  # Estimate CATE using active splitting (using less data if possible)
-  n = length(Y) #sample size
-  PW = rep(1,n)
-  
-  # Calculate diversity score
-  Xt <- t(X)              
-  inv_XtX <- solve(Xt %*% X)  
-  s <- colSums(X)          
-  Div <- (X %*% inv_XtX %*% s)**2
-  
-  # Calculate labels
-  R = Y - mu # residual of mu
-  
-  prob = sqrt(Div)/sum(sqrt(Div))*round((dim(X)[2]*3 + 1))
-  prob[prob>=1] = 1
-  prob[prob< 0.05] =  0.05
-  
-  sample = rbinom(n = n, size = 1, prob)
-  n_0 = sum(sample)
-  train.index = which(sample>0.5) # training units
-  test.index = setdiff(1:n,train.index) #testing units
-  
-  
-  PW[train.index] = prob[train.index]
-  PW[test.index] = 1-prob[test.index]
-
-  X_ = cbind(1, X[train.index,])
-  R_ = (R/ (W-Ex))[train.index]
-  W_ = diag(c(((W-Ex)**2)[train.index])) /PW[train.index]
-  inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-4*diag(rep(1.0,dim(X_)[2])))
+  inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
   XTWR = t(X_) %*% W_ %*% R_
   beta = inv_XTWX %*% XTWR
   tau = cbind(1, X) %*% beta
   
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  #beta.imputed = Posterior_fit(train.index, inv_XTWX, XTWR, X, R, W, Ex, Q, PW)
-  R.imputed = Q[[1]]*(R / (0 - Ex)) + Q[[2]]*(R / (1 - Ex))
-  Rsqr.imputed = Q[[1]]*(R / (0 - Ex)-R.imputed)**2 + Q[[2]]*(R / (1 - Ex)-R.imputed)**2
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE)
+  tau.imputed = cbind(1, X) %*% beta.imputed
   
-  active.sampling = function(){
-    
-    DR.test = sqrt(Div[test.index]*Rsqr.imputed[test.index])
-    prob = DR.test/sum(DR.test)
-    prob[prob< 0.05] = 0.05
-    
-    n_sample = 0
-    t = 0
-    while (n_sample<1){
-      sample = rbinom(n = length(DR.test), size = 1, prob = prob)
-      n_sample = sum(sample)
-      t = t+1
-    }
-    
+  mu0.hat <- mu - Ex * tau.imputed
+  mu1.hat <- mu0.hat + tau.imputed
+  
+  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed))
+}
 
-    #prob[prob>0.975] = 0.975
-    prob[sample>0.5] = prob[sample>0.5]*(1-prob[sample>0.5])**(t-1)
-    prob[sample<0.5] = (1-prob[sample<0.5])**(t)
-    selected = which(sample > 0.5) 
-    return(list(selected,prob))
-    
+
+Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01,weighting=FALSE){
+
+  n = length(W)
+  k = sum(A[1,]) 
+  n.train = length(train.index)
+  test.index = setdiff(1:n,train.index)
+
+  if (weighting){
+    v = rep(0,n)
+    v[test.index] = 1.0
+    p.test = (A %*% v)/k
+    p.train = 1 - p.test
+    p.train.marginal = n.train/n
+    p.test.marginal = 1 - p.train.marginal
+    IW = p.test/pmax(p.train,p)*p.train.marginal/p.test.marginal
+  }else{
+    IW = rep(1,n)
   }
+
+  XX <- cbind(1, rbind(X,X))
+  W1 = W1_ = Ex**2 ; W2 = W2_ =  (1 - Ex)**2
+  W1_[train.index] = W[train.index] * W1[train.index] * IW[train.index]
+  W1_[test.index] =  W1[test.index]*Q[test.index]
+
+  W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
+  W2_[test.index] = W2[test.index]*(1-Q[test.index])
   
-  max_epochs <- round(max_proportion*n)-n_0  # maximum number of training epochs
-  loss <- 1      # initial loss
-  window_size <- 20      # window size for calculating the parameter change
-  loss_threshold <- 0.001    # stopping threshold 
+  inv_XTWX_ = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
+  beta = inv_XTWX_ %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
+  
+
+  return(beta)
+}
+
+
+nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01,...){
+  
+  # Y is an n-dimensional outcome matrix
+  # X is an n x d covariate matrix 
+  # Ex is an n-dimensional treatment assignment probability vector
+  # W is an observed treatment assignment vector
+  # mu is an outcome regression model
+  # Group is the group indicator
+  # proportion is the max prop. of data points used for estimation
+  # groupwise indicate if we will select points evenly across the groups
+  # k is the number of nearest neighbors used in the knn model for correcting selection bias
+  # p is the threshold for clipping the inverse probability weights
+  
+  # Compute the sample size
+  n = length(Y) 
+  # Compute the k-nearest neighbors of every point; the j-th row of A indicates the neighbors of the j-th point
+  A = knn.indices(X,k)  
+
+  # Compute the residuals
+  R = Y - mu
+  
+  # Initialization
+  n_0 = min(dim(X)[2]+5, round(0.05*n))
+  train.index = select.train(Group, n_0/n) 
+  test.index = setdiff(1:n,train.index) 
+  n.train = length(train.index)
+  n.test = length(test.index)
+  prop.group.test = prop.group(Group,test.index)
+  
+  if (weighting){
+    v = rep(0,n)
+    v[test.index] = 1.0
+    p.test = (A %*% v)/k
+    p.train = 1 - p.test
+    p.train.marginal = n.train/n
+    p.test.marginal = 1 - p.train.marginal
+    IW = p.test/pmax(p.train,p)*p.train.marginal/p.test.marginal
+  }else{
+    IW = rep(1,n)
+  }
+
+  # Compute OLS
+  X_ = cbind(1, X[train.index,])
+  R_ = (R/ (W-Ex))[train.index]
+  W_ = diag(c(((W-Ex)**2 * IW)[train.index]))
+  inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
+  XTWR = t(X_) %*% W_ %*% R_
+  beta = inv_XTWX %*% XTWR
+  tau = cbind(1, X) %*% beta
+  
+  # Compute Imputed OLS
+  Q = Posterior(train.index, tau, X, R, W, Ex)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A)
+  tau.imputed = cbind(1, X) %*% beta.imputed
+  
+  # Set the stopping rule
+  loss <- 1; window_size <-50; loss_threshold <- 0.01
   loss_history <- rep(Inf, window_size)
   epoch <- 0
-  
-  weight = (W-Ex)**2
-  residual = R/ (W-Ex)
-
   stop = FALSE
-  while (length(train.index) <= 0.5*n) {
-
-    out = active.sampling() 
-    idx.active = out[[1]]
-    PW[test.index] = PW[test.index] * out[[2]]
+  Group.idx = sort(unique(Group))
+  
+  while ( length(train.index) < ceiling(proportion * n) ) {
+    epoch <- epoch + 1
     
-    for (i in idx.active){
-      new = test.index[i]
-      epoch <- epoch + 1
-      x = X[new,]
-      w = weight[new] /(PW[new])
-      r = residual[new]
-      inv_XTWX = inv_update(inv_XTWX, w, x, 1)
-      XTWR = xr_update(XTWR, w, r, x, 1)
+    
+    mu0.hat <- mu - Ex * tau.imputed
+    mu1.hat <- mu0.hat + tau.imputed
+    TE = (Y-mu1.hat)/Ex + (Y-mu0.hat)/(1-Ex)
 
-      beta.copy = beta
-      beta = inv_XTWX %*% XTWR
-      tau = cbind(1, X) %*% beta
-      train.index = c(train.index, new)
-      
-      Q = Posterior(train.index, tau, X, R, W, Ex)
-      R.imputed = Q[[1]]*(R / (0 - Ex)) + Q[[2]]*(R / (1 - Ex))
-      Rsqr.imputed = Q[[1]]*(R / (0 - Ex)-R.imputed)**2 + Q[[2]]*(R / (1 - Ex)-R.imputed)**2
-      
-      # compute the parameter change due to the new data point
-      loss = sum((beta - beta.copy)**2)/sum((beta.copy)**2)
-      loss_history <- c(loss_history[-1], loss)
+    # Predict the CRT's power loss after moving the j-th point from inference to nuisance estimation
+    power = numeric(n)
+    for (g in Group){
+      index.g = which(Group == g)
+      test.index.g = intersect(test.index, index.g)
+      qte.g = Q[test.index.g]*TE[test.index.g]
+      ete.g = Ex[test.index.g]*TE[test.index.g]
+      vqte.g = Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2
+      vete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
       
       
-      if (epoch >= window_size) {
-        ave_loss <- mean(loss_history)
-        if (ave_loss < loss_threshold) { 
-          stop =TRUE
-          cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
-          cat("Change of parameter stopped in ART (%):", 100*round(ave_loss,6),"\n")
-          break
-        }
+      qte.sum = sum(qte.g); ete.sum = sum(ete.g)
+      vqte.g.sum = sum(vqte.g); vete.g.sum = sum(vete.g)
+      
+      power.g = pnorm((qte.sum - ete.sum)/sqrt(vqte.g.sum + vete.g.sum))
+      power = power + power.g
+
+      add.g = pnorm((qte.sum - ete.sum - qte.g + ete.g)/sqrt( (vqte.g.sum- vqte.g) + (vete.g.sum - vete.g)))
+      power[test.index.g] = power[test.index.g] - power.g + add.g  #sum up the power of all CRTs
+    }
+    power = power[test.index]
+
+    #Compute weighted and Standardized objective function 
+   
+  
+    # Find out the proportion of inference units in each group
+    prop.group.test = prop.group(Group, Group.idx,test.index)
+    
+    # Find out which group has a large enough inference fold and compute the proportions
+    B = prop.group.test > (1-proportion)
+    Group.0 = Group.idx[B]
+
+    if (groupwise){
+      # If groupwise, randomly choose a group with enough proportion
+      prop.group.test = prop.group.test[B]
+      g.selected = Group.0[which(rmultinom(n = 1, size = 1, prob = prop.group.test/sum(prop.group.test))==1)]
+      # Choose the best point in the group
+      idx = Group[test.index] == g.selected
+  
+    }else{
+      # Otherwise, select the best point from the groups with enough proportions
+      idx = which(Group[test.index] %in% Group.0)
+    }
+    
+    new = test.index[idx][which.max(power[idx])]
+    
+    # Update the indices of the nuisance and inference folds
+    train.index = c(train.index, new)
+    test.index = setdiff(1:n,train.index)
+    
+    # Update the OLS model
+    n.train = length(train.index); n.test = length(test.index)
+    
+    beta.copy = beta.imputed
+    tau.copy = tau.imputed
+
+    # Update Imputed OLS
+    Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
+    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A)
+    tau.imputed = cbind(1, X) %*% beta.imputed
+
+    # Compute the estimator change due to the new data point
+    loss = sum((tau.imputed[test.index]-tau.copy[test.index])**2)/sum((tau.copy-mean(tau.copy[test.index]))**2)
+    #loss = sum((beta.imputed - beta.copy)**2)/sum(beta.copy**2)
+    
+    loss_history <- c(loss_history[-1], loss)
+    ave_loss <- max(loss_history)
+
+    if (epoch >= window_size) {
+      #
+      if (ave_loss < loss_threshold) { 
+        stop =TRUE
+        break
       }
     }
-    test.index = setdiff(1:n,train.index)
+    
     if (stop){break} 
     
   }
   
-  # we have sampled the most influential (i.e. representative) points in the sense that they reduce the uncertainty of p(z|x,y) of the others
-  # compute the final model with the unknown treatment variables marginalized out (i.e. imputed).
-  beta.imputed = Posterior_fit(train.index, inv_XTWX, XTWR, X, R, W, Ex, Q, PW)
-  tau.imputed = cbind(1, X) %*% beta.imputed
-  mu0.hat <- mu - Ex * tau.imputed
-  mu1.hat <- mu0.hat + tau.imputed
+  cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
   
   return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index)) 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -291,7 +277,7 @@ test.stats = function(Y, W, stats = "AIPW", Ex = NULL, mu0.hat = NULL, mu1.hat =
     n0 = n * (1 - Ex)
   }
   
-  
+
   if (stats == "denoise") {
     
     IF = W * (Y - mu.hat)/Ex - (1 - W) * (Y - mu.hat)/(1-Ex)
@@ -299,8 +285,11 @@ test.stats = function(Y, W, stats = "AIPW", Ex = NULL, mu0.hat = NULL, mu1.hat =
     
   }else if(stats == "AIPW"){
     
-    IF = W * (Y - mu1.hat)/Ex - (1 - W) * (Y - mu0.hat)/(1-Ex) + tau.hat
-    value = mean(IF)/sd(IF)
+    #IF = -(Y-mu.hat-(W-Ex)*tau.hat)**2
+    
+    IF = (W * (Y - mu1.hat)/Ex - (1 - W) * (Y - mu0.hat)/(1-Ex) + tau.hat) 
+    
+    value = mean(IF)#/sd(IF)
     
   }  
   
@@ -310,13 +299,15 @@ test.stats = function(Y, W, stats = "AIPW", Ex = NULL, mu0.hat = NULL, mu1.hat =
 
 
 
+
+
 test.stats.group = function(Y, W, Group, stats = "AIPW", Ex = NULL, mu0.hat = NULL, mu1.hat = NULL, mu.hat = NULL, tau.hat = NULL, test.index = NULL) {
   # Get the unique levels of the grouping variable
   Group.level = sort(unique(Group))
   
-  
   if (is.null(test.index)==FALSE){
     W =  sapply(Ex, function(p) rbinom(1, size = 1, prob = p))
+    #W[test.index] = W_[test.index]
   }
   
   # Compute the test statistic value for each group level
@@ -336,50 +327,149 @@ test.stats.group = function(Y, W, Group, stats = "AIPW", Ex = NULL, mu0.hat = NU
 
 
 
-# BH
-BH.threshold = function(pval, q = 0.1){
-  
-  # BH procedure
-  
-  # preprocess
-  m = length(pval)
-  pval = sort(pval, decreasing = FALSE)
-  
-  # compute the threshold of the BH procedure
-  FDR.hat = m * pval/seq(1, m)
-  pval.index = which(FDR.hat <= q)
-  if(length(pval.index) == 0){return(-1e6)}
-  threshold = pval[max(pval.index)]
-  return(threshold)
-}
 
 
-BH.threshold.Storey = function(pval, q = 0.1, lambda = 0.5){
+nuisance.mu = function(Y = NULL, X = NULL) {
   
-  # BH procedure + Storey correction
+  # Load required library
+  library(glmnet)
   
-  # preprocess
-  m = length(pval)
-  pval = sort(pval, decreasing = FALSE)
+  # Perform cross-validated ridge regression
+  cv_model <- cv.glmnet(
+    x = as.matrix(X), 
+    y = Y, 
+    alpha = 0,  # Ridge regression
+    nfolds = 25
+  )
   
-  # Estimate pi0 using Storey's method
-  pi0 = min(1, mean(pval > lambda) / (1 - lambda))
+  # Get out-of-sample predictions
+  oos_pred <- predict(cv_model, as.matrix(X), s = "lambda.min")
   
-  # compute the threshold of the BH procedure with Storey correction
-  FDR.hat = pi0 * m * pval / seq(1, m)
-  pval.index = which(FDR.hat <= q)
-  if(length(pval.index) == 0){return(-1e6)}
-  threshold = pval[max(pval.index)]
-  return(threshold)
+  return(oos_pred)
 }
 
 
 
-permutation.p.value = function(stats, stats.ref){
+
+inv_update = function(inv_x, w, x, sign){
   
-  # Compute a permutation p-value given the observed stats and reference distribution
-  
-  if(is.na(stats)){return(1)}
-  return((sum(stats <= stats.ref[!is.na(stats.ref)]) + 1) / (length(stats.ref[!is.na(stats.ref)]) + 1))
+  # Sherman–Morrison–Woodbury update of inversion
+
+  u <- sqrt(w) * c(1,x)
+  inv_u = inv_x %*% u
+  inv_update = inv_x - sign * (inv_u %*% t(inv_u)) / (1 + sign * t(u) %*% inv_u)[1]
+  return(inv_update)
 }
 
+xr_update = function(xtwr, w, r, x, sign){
+  
+  # Projection update
+  
+  return(xtwr + sign* w * r *  c(1,x))
+}
+
+
+
+
+Posterior = function(train.index, tau, X, R, W, Ex){
+  
+  # generate leave-one-out residual
+  n = length(Ex) 
+  res <- numeric(n) #rep(0,length(train.index))
+  
+  treated.index = which(W > 0.5) # treated units
+  control.index = which(W < 0.5) # control units
+  
+  #for (i in 1:length(train.index)){
+  #  res[i] = R[train.index[i]] - (W[train.index[i]]-Ex[train.index[i]])*tau[train.index[i]] 
+  #}
+  
+  res =  R[train.index] -  (W[train.index]-Ex[train.index])*tau[train.index]
+  
+  mean = 0 # mean(res)
+  std = std(res)
+  
+  z.1 = pmax(pmin((R - (1-Ex)*tau - mean)/std,4),-4)
+  z.0 =  pmax(pmin((R - (0-Ex)*tau - mean)/std,4),-4)
+  
+  p.zxy.1 = Ex*dnorm(z.1)
+  p.zxy.0 = (1-Ex)*dnorm(z.0)
+  
+  p.zxy.1 = (p.zxy.1)/(p.zxy.1 + p.zxy.0)
+  
+  return(p.zxy.1)
+}  
+
+
+
+
+
+
+knn.indices <- function(X, k) {
+  # X is an n x d matrix
+  # k is the total number of "neighbors" to pick, including i itself
+  # Returns an n x n matrix where row i has 1's for
+  # the k closest points to i (including i)
+  
+  n <- nrow(X)
+  # Compute pairwise distances (as.matrix to ensure it’s a dense matrix)
+  D <- as.matrix(dist(X))
+  
+  # Initialize the result as an n x n matrix of 0s
+  A <- matrix(0, nrow = n, ncol = n)
+  
+  for (i in seq_len(n)) {
+    # Get all indices sorted by distance from i (including i)
+    sorted_indices <- order(D[i, ])
+    
+    # Take the top k, which now includes 'i' itself
+    knn <- sorted_indices[1:k]
+    
+    # Mark these k positions in row i as 1
+    A[i, knn] <- 1
+  }
+  
+  return(A)
+}
+
+
+prop.group <- function(Group, Group.idx,test.index){
+  
+  probs = NULL
+  for (g in Group.idx){
+    probs = c(probs, sum(Group[test.index] == g)/sum(Group == g))
+  }
+  return(probs)
+}
+
+
+select.train <- function(Group, prop) {
+
+  unique_groups <- unique(Group)
+  
+  # Initialize an empty vector for the indices
+  training.indices <- NULL
+  
+  for (g in unique_groups) {
+    # Indices for group g
+    idx.g <- which(Group == g)
+    
+    # How many to pick in group g
+    n.pick <- round(length(idx.g) * prop)
+    
+    # Randomly sample those indices
+    chosen <- sample(idx.g, n.pick)
+    
+    # Combine into the overall result
+    training.indices <- c(training.indices, chosen)
+  }
+  
+  return(training.indices)
+}
+
+
+
+normalize <- function(x, min_val = 0, max_val = 1) {
+  rng <- range(x, na.rm = TRUE)
+  (x - rng[1]) / (rng[2] - rng[1]) * (max_val - min_val) + min_val
+}
