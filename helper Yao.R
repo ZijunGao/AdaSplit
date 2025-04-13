@@ -11,8 +11,9 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   
   # initial fit
   n = length(Y)
+  X = as.matrix(X) # trun data.frame to matrx
   R = Y - mu
-  A = knn.indices(X,k) 
+  A = knn.indices(X,k)
   X_ = cbind(1, X[train.index,])
   R_ = (R/ (W-Ex))[train.index]
   W_ = diag(c(((W-Ex)**2)[train.index]))
@@ -88,7 +89,10 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   # Compute the sample size
   n = length(Y) 
   # Compute the k-nearest neighbors of every point; the j-th row of A indicates the neighbors of the j-th point
-  A = knn.indices(X,k)  
+  A = knn.indices(X,k)
+  
+  X = as.matrix(X) # trun data.frame to matrx
+  
 
   # Compute the residuals
   R = Y - mu
@@ -168,7 +172,6 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       power[test.index.g] = power[test.index.g] - power.g + add.g  #sum up the power of all CRTs
     }
     power = power[test.index]
-
     #Compute weighted and Standardized objective function 
    
   
