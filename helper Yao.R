@@ -24,9 +24,10 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   
   X_ = cbind(1, X)
   inv_XTWX = solve(t(X_) %*% diag(c(((W-Ex)**2 ))) %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
+  inv_XTWX_X = inv_XTWX %*% t(cbind(1, rbind(X,X)))
   
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, inv_XTWX = inv_XTWX)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, inv_XTWX_X = inv_XTWX_X)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   mu0.hat <- mu - Ex * tau.imputed
@@ -36,7 +37,7 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
 }
 
 
-Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FALSE, inv_XTWX = NULL){
+Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FALSE, inv_XTWX_X = NULL){
 
   n = length(W)
   k = sum(A[1,]) 
@@ -65,8 +66,13 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
   
   if (weighting){
     inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
+    beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
+  }else{
+    
+    beta = rowSums(inv_XTWX_X * rep(c(W1_,W2_)*c( R/(1 - Ex),  R/(0 - Ex)), each = nrow(inv_XTWX_X)))
+   
   }
-  beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
+  
   
 
   return(beta)
@@ -129,10 +135,11 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   X_ = cbind(1, X)
   inv_XTWX = solve(t(X_) %*% diag(c(((W-Ex)**2 ))) %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
+  inv_XTWX_X = inv_XTWX %*% t(cbind(1, rbind(X,X)))
   
   # Compute Imputed OLS
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, inv_XTWX = inv_XTWX)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, inv_XTWX_X = inv_XTWX_X)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
@@ -142,10 +149,10 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   stop = FALSE
   Group.idx = sort(unique(Group))
   
+
   
   while ( length(train.index) < ceiling(proportion * n) ) {
     epoch <- epoch + 1
-    
     
     mu0.hat <- mu - Ex * tau.imputed
     mu1.hat <- mu0.hat + tau.imputed
@@ -153,7 +160,10 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
 
     # Predict the CRT's power loss after moving the j-th point from inference to nuisance estimation
     power = numeric(n)
-    for (g in Group){
+    
+    
+    for (g in Group.idx){
+
       index.g = which(Group == g)
       test.index.g = intersect(test.index, index.g)
       qte.g = Q[test.index.g]*TE[test.index.g]
@@ -161,16 +171,17 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       vqte.g = Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2
       vete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
       
-      
       qte.sum = sum(qte.g); ete.sum = sum(ete.g)
       vqte.g.sum = sum(vqte.g); vete.g.sum = sum(vete.g)
-      
+
       power.g = pnorm((qte.sum - ete.sum)/sqrt(vqte.g.sum + vete.g.sum))
       power = power + power.g
 
       add.g = pnorm((qte.sum - ete.sum - qte.g + ete.g)/sqrt( (vqte.g.sum- vqte.g) + (vete.g.sum - vete.g)))
       power[test.index.g] = power[test.index.g] - power.g + add.g  #sum up the power of all CRTs
     }
+
+      
     power = power[test.index]
     #Compute weighted and Standardized objective function 
    
@@ -205,10 +216,9 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
     beta.copy = beta.imputed
     tau.copy = tau.imputed
-
-    # Update Imputed OLS
+    
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
-    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, inv_XTWX = inv_XTWX)
+    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, inv_XTWX_X = inv_XTWX_X)
     tau.imputed = cbind(1, X) %*% beta.imputed
 
     # Compute the estimator change due to the new data point
