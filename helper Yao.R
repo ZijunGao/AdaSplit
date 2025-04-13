@@ -32,7 +32,7 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
 }
 
 
-Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01,weighting=FALSE){
+Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FALSE, inv_XTWX = NULL){
 
   n = length(W)
   k = sum(A[1,]) 
@@ -59,8 +59,10 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01,weighting=FALS
   W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
   W2_[test.index] = W2[test.index]*(1-Q[test.index])
   
-  inv_XTWX_ = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
-  beta = inv_XTWX_ %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
+  if (is.null(inv_XTWX)){
+    inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
+  }
+  beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
   
 
   return(beta)
@@ -117,9 +119,13 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   beta = inv_XTWX %*% XTWR
   tau = cbind(1, X) %*% beta
   
+  
+  X_ = cbind(1, X)
+  inv_XTWX = solve(t(X_) %*% diag(c(((W-Ex)**2 ))) %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
+  
   # Compute Imputed OLS
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, inv_XTWX = inv_XTWX)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
@@ -128,6 +134,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   epoch <- 0
   stop = FALSE
   Group.idx = sort(unique(Group))
+  
   
   while ( length(train.index) < ceiling(proportion * n) ) {
     epoch <- epoch + 1
@@ -195,7 +202,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
 
     # Update Imputed OLS
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
-    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A)
+    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, inv_XTWX = inv_XTWX)
     tau.imputed = cbind(1, X) %*% beta.imputed
 
     # Compute the estimator change due to the new data point
