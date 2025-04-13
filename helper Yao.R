@@ -162,10 +162,8 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
 
       index.g = which(Group == g)
       test.index.g = intersect(test.index, index.g)
-
-
       qte.g = Q[test.index.g]*TE[test.index.g]
-      ete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
+      ete.g = Ex[test.index.g]*TE[test.index.g]
       vqte.g = Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2
       vete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
       
