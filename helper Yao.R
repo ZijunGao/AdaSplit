@@ -62,7 +62,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
   W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
   W2_[test.index] = W2[test.index]*(1-Q[test.index])
   
-  if (weighting==TRUE){
+  if (weighting){
     inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
   }
   beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
