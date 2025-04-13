@@ -1,5 +1,10 @@
 # Create a hypothetical two-stage enrichment trial based on the SPRINT trial.
 # Subgroup: age groups: [0, 59], [60, 69], [70, 79], [80, 100].
+
+# Not making much sense
+# Random
+
+# Not linear.
 rm(list = ls())
 library(ggplot2)
 library(reshape2)
@@ -40,14 +45,18 @@ X <- as.data.frame(lapply(X, function(col) {
     return(as.numeric(col))
   }
 }))
+X = as.matrix(X)
 W = data$INTENSIVE
 # Y = 1 - data$EVENT_PRIMARY
-Y = ((data$T_PRIMARY + 00)*(1-data$EVENT_PRIMARY) + data$EVENT_PRIMARY * data$T_PRIMARY * 0) #data$T_PRIMARY*(1-data$EVENT_PRIMARY); + data$T_PRIMARY
-#(data$T_PRIMARY>800)*data$T_PRIMARY #*(1-data$EVENT_PRIMARY) # ((data$T_PRIMARY + 500) *(1-data$EVENT_PRIMARY) + data$EVENT_PRIMARY * data$T_PRIMARY)
-#Y = log(Y+0.000001)
+# Y = data$T_PRIMARY #data$T_PRIMARY*(1-data$EVENT_PRIMARY); + data$T_PRIMARY
+# Y = ((data$T_PRIMARY + 00)*(1-data$EVENT_PRIMARY) + data$EVENT_PRIMARY * data$T_PRIMARY * 0) #data$T_PRIMARY*(1-data$EVENT_PRIMARY); + data$T_PRIMARY
+# Y = (data$T_PRIMARY>800)*data$T_PRIMARY # *(1-data$EVENT_PRIMARY) # ((data$T_PRIMARY + 500) *(1-data$EVENT_PRIMARY) + data$EVENT_PRIMARY * data$T_PRIMARY)
+# Y = pmin(1000,data$T_PRIMARY)
+Y = pmax(800,data$T_PRIMARY)
+Y = log(Y+1) # log(Y+0.000001)
 d = ncol(X)
 n = nrow(X)
-set.seed(318); random.index = sample(n, 1000); X = X[random.index,]; Y = Y[random.index]; W = W[random.index]; n = length(random.index)
+set.seed(318); random.index = sample(n, 2000); X = X[random.index,]; Y = Y[random.index]; W = W[random.index]; n = length(random.index)
 Group.number = 1 # total number of groups
 G = rep(0, n)
 Group = rep(0, n)
@@ -77,11 +86,12 @@ test.stats.ref.active = t(replicate(M, test.stats.group(Y = Y[test.index.active]
 if(dim(test.stats.ref.active)[1] == 1){test.stats.ref.active = t(test.stats.ref.active)}
 
 # Calculate p-values for each group
-(sapply(seq(1, length(test.stats.value.active)), function(x) { sum(test.stats.ref.active[, x]>=test.stats.value.active[x])/(M+1) + 1/(M+1)}))
+p.value.active = (sapply(seq(1, length(test.stats.value.active)), function(x) { sum(test.stats.ref.active[, x]>=test.stats.value.active[x])/(M+1) + 1/(M+1)}))
 #simulation_results_art[j,]
 
 
 # Sample splitting
+# set.seed(12) # 123: select 4000 units
 train.index.ss = select.train(Group, proportion)  #sample(n, proportion*n) #sample(n, length(train.index.active))  
 #sample(n, proportion*n)  #select.train(Group, proportion) 
 test.index.ss = setdiff(1:n, train.index.ss)
@@ -99,7 +109,8 @@ test.stats.ref = t(replicate(M, test.stats.group(Y = Y[test.index.ss], W = W[tes
 if(dim(test.stats.ref)[1] == 1){test.stats.ref = t(test.stats.ref)}
 
 # Calculate p-values for each group
-(sapply(seq(1, length(test.stats.value)), function(x) { sum(test.stats.ref[, x]>=test.stats.value[x])/(M+1) + 1/(M+1)}))
+p.value.ss = (sapply(seq(1, length(test.stats.value)), function(x) { sum(test.stats.ref[, x]>=test.stats.value[x])/(M+1) + 1/(M+1)}))
 
-
-
+# result
+print("active splitting"); print(p.value.active)
+print("sample splitting"); print(p.value.ss)
