@@ -47,14 +47,14 @@ Y = 1 - data$EVENT_PRIMARY
 d = ncol(X)
 n = nrow(X)
 
-set.seed(318) # 318
+set.seed(318) # 318; 123
 index = seq(1, n) # seq(1, n); sample(n, 4000)
 X = X[index,]; Y = Y[index]; W = W[index]; n = length(index)
-# Group.number = 1; G = rep(0, n); Group = rep(0, n) # total number of groups
+# Group.number = 1; G = rep(0, n); Group = rep(0, n) # a single group
 Group.number = 8 # total number of groups
 X$High.risk.group = (X$RISK10YRS > 18) # 18 
 X$Senior.group = (X$AGE > 70) # 70
-X$Obese.group = (X$BMI > 27) # 30
+X$Obese.group = (X$BMI > 27) # 27
 Group = X$Obese.group * 4 + X$Senior.group * 2 + X$High.risk.group
 X$Senior.group = NULL; X$Obese.group = NULL; X$High.risk.group = NULL
 X = as.matrix(X)
@@ -64,12 +64,12 @@ M = 1000 # number of permutations
 proportion = 0.5 # proportion of randomness in the nuisance fold
 test.stats.method ="AIPW" # test statistics
 
-set.seed(123) # 318; 813
+set.seed(318) # 318; 813; 123
 # mu.hat = nuisance.mu(Y, X) # linear regression
 mu.hat = nuisance.mu.xgboost(Y, X) # random forests
 
 # Randomization test
-tau.hat.active = nuisance.tau.active(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, Group = Group, proportion = proportion, robust = T) # estimate tau using active learning; robust = T. Use
+tau.hat.active = nuisance.tau.active(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, Group = Group, proportion = proportion, robust = T) # estimate tau using active learning; robust = T, use power = -(TE^2)^2, and throw the point with the maximal power to the nuisance fold.
 train.index.active = tau.hat.active$train.index # the data points fitted to the nuisance
 test.index.active = setdiff(1:n,train.index.active) # the data points used for inference
 
@@ -100,7 +100,8 @@ if(dim(test.stats.ref.active)[1] == 1){test.stats.ref.active = t(test.stats.ref.
 p.value.active = sapply(seq(1, length(test.stats.value.active)), function(x) {sum(test.stats.ref.active[, x]>=test.stats.value.active[x])/(M+1) + 1/(M+1)})
 
 
-m.pass = 1
+set.seed(318)
+m.pass = 10
 p.value.ss = matrix(0, nrow = m.pass, ncol = Group.number)
 for(i in 1 : m.pass){
   # Sample splitting
@@ -134,9 +135,47 @@ for(i in 1 : m.pass){
   
   # Calculate p-values for each group
   p.value.ss[i,] = sapply(seq(1, length(test.stats.value)), function(x) { sum(test.stats.ref[, x]>=test.stats.value[x])/(M+1) + 1/(M+1)})
+  
+  print(i)
 }
 
+# Double-dipping
+set.seed(318)
+train.index.dd = seq(1, n); test.index.dd = seq(1, n)
+
+# Fit the nuisance parameter
+tau.hat.dd = nuisance.tau.ss(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, train.index = train.index.dd)
+
+# Randomization tests
+test.stats.value.dd = test.stats.group(Y = Y, 
+                                    W = W, 
+                                    Group = Group, 
+                                    stats = test.stats.method, 
+                                    Ex = Ex, 
+                                    mu0.hat = tau.hat.dd$mu0, 
+                                    mu1.hat = tau.hat.dd$mu1, 
+                                    mu.hat = mu.hat, 
+                                    tau.hat = tau.hat.dd$tau)
+
+test.stats.ref.dd = t(replicate(M, test.stats.group(Y = Y, 
+                                                 W = W, 
+                                                 Group = Group, 
+                                                 stats = test.stats.method, 
+                                                 Ex = Ex, 
+                                                 mu0.hat = tau.hat.dd$mu0, 
+                                                 mu1.hat = tau.hat.dd$mu1, 
+                                                 mu.hat = mu.hat, 
+                                                 tau.hat = tau.hat.dd$tau, 
+                                                 test.index = test.index.dd))) 
+if(dim(test.stats.ref.dd)[1] == 1){test.stats.ref.dd = t(test.stats.ref.dd)}
+
+# Calculate p-values for each group
+p.value.dd = sapply(seq(1, length(test.stats.value.dd)), function(x) { sum(test.stats.ref.dd[, x]>=test.stats.value.dd[x])/(M+1) + 1/(M+1)})
+
+
+
 # Baseline, not model-based
+set.seed(318)
 test.stats.value.baseline = test.stats.group(Y = Y, 
                                              W = W, 
                                              Group = Group, 
@@ -167,7 +206,14 @@ p.value.baseline = (sapply(seq(1, length(test.stats.value.baseline)), function(x
   
 
 # result
-print("active splitting"); print(p.value.active)
-print("sample splitting"); print(p.value.ss)
-print("baseline"); print(p.value.baseline)
+record = list(); record$pValue = list()
+record$pValue$RT = p.value.baseline
+record$pValue$SS = p.value.ss
+record$pValue$DD = p.value.dd
+record$pValue$ART = p.value.active
+print(record)
+
+# saveRDS
+# saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT.rds")
+# record = readRDS("~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT.rds")
 
