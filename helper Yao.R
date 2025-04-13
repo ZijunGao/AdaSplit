@@ -21,8 +21,11 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   beta = inv_XTWX %*% XTWR
   tau = cbind(1, X) %*% beta
   
+  X_ = cbind(1, X)
+  inv_XTWX = solve(t(X_) %*% diag(c(((W-Ex)**2 ))) %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
+  
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, inv_XTWX = inv_XTWX)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   mu0.hat <- mu - Ex * tau.imputed
@@ -59,7 +62,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
   W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
   W2_[test.index] = W2[test.index]*(1-Q[test.index])
   
-  if (is.null(inv_XTWX)){
+  if (weighting==TRUE){
     inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
   }
   beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
