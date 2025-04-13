@@ -9,7 +9,7 @@ library(gridExtra)
 myHeatmap = function(data, title = ""){
   p = ggplot(data, aes(x = Var2, y = Var1, fill = value)) +
   geom_tile() +
-  scale_fill_gradientn(
+  scale_fill_gradiennt(
     colors = c("red", "lightcoral", "grey", "lightblue"),
     trans = "log",
     breaks = c(1e-2, 1e-1, 1),

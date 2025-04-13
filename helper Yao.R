@@ -74,7 +74,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
 }
 
 
-nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01,...){
+nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01, robust = F...){
   
   # Y is an n-dimensional outcome matrix
   # X is an n x d covariate matrix 
@@ -92,7 +92,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   # Compute the k-nearest neighbors of every point; the j-th row of A indicates the neighbors of the j-th point
   A = knn.indices(X,k)
   
-  X = as.matrix(X) # trun data.frame to matrx
+  X = as.matrix(X) # turn data.frame to matrx
   
 
   # Compute the residuals
@@ -138,7 +138,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
-  loss <- 1; window_size <-50; loss_threshold <- 0.01
+  loss <- 1; window_size <- 5; loss_threshold <- 0.1
   loss_history <- rep(Inf, window_size)
   epoch <- 0
   stop = FALSE
@@ -147,6 +147,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
 
   
   while ( length(train.index) < ceiling(proportion * n) ) {
+    if(epoch %% 10 == 0){print(epoch)}
     epoch <- epoch + 1
     
     mu0.hat <- mu - Ex * tau.imputed
@@ -165,6 +166,8 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       ete.g = Ex[test.index.g]*TE[test.index.g]
       vqte.g = Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2
       vete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
+      # vqte.g = rep(mean(Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2), length(test.index.g)) # to be deleted
+      # vete.g = rep(mean(Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2), length(test.index.g)) # to be deleted
       
       qte.sum = sum(qte.g); ete.sum = sum(ete.g)
       vqte.g.sum = sum(vqte.g); vete.g.sum = sum(vete.g)
@@ -199,7 +202,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       # Otherwise, select the best point from the groups with enough proportions
       idx = which(Group[test.index] %in% Group.0)
     }
-    
+    if(robust){power = -(TE^2)[test.index.g]}
     new = test.index[idx][which.max(power[idx])]
     
     # Update the indices of the nuisance and inference folds
@@ -212,6 +215,8 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     beta.copy = beta.imputed
     tau.copy = tau.imputed
     
+    if (epoch %% 20 ==0){
+      
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
     beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A)
     tau.imputed = cbind(1, X) %*% beta.imputed
@@ -231,6 +236,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       }
     }
     
+    }
     if (stop){break} 
     
   }
@@ -324,7 +330,7 @@ test.stats.group = function(Y, W, Group, stats = "AIPW", Ex = NULL, mu0.hat = NU
   Group.level = sort(unique(Group))
   
   if (is.null(test.index)==FALSE){
-    W =  sapply(Ex, function(p) rbinom(1, size = 1, prob = p))
+    W = sapply(Ex, function(p) rbinom(1, size = 1, prob = p))
     #W[test.index] = W_[test.index]
   }
   
@@ -367,6 +373,48 @@ nuisance.mu = function(Y = NULL, X = NULL) {
 }
 
 
+nuisance.mu.xgboost = function(Y = NULL, X = NULL, nfold = 5, eta = 0.01, nrounds = 1000, early_stopping_rounds = 10) {
+  
+  # Load required library
+  library(xgboost)
+  library(caret)
+  
+  # Create folds for cross-validation
+  folds <- createFolds(Y, k = nfold, list = TRUE, returnTrain = FALSE)
+  
+  # Initialize vector to store out-of-sample predictions
+  oos_pred <- rep(NA, length(Y))
+  
+  # XGBoost parameters
+  params <- list(
+    objective = "reg:squarederror",
+    eval_metric = "rmse",
+    eta = eta
+  )
+  
+  # Perform cross-validation manually
+  for (i in seq_along(folds)) {
+    test_idx <- folds[[i]]
+    train_idx <- setdiff(seq_along(Y), test_idx)
+    
+    dtrain <- xgb.DMatrix(data = X[train_idx, ], label = Y[train_idx])
+    dtest <- xgb.DMatrix(data = X[test_idx, ])
+    
+    model <- xgb.train(
+      params = params,
+      data = dtrain,
+      nrounds = nrounds,
+      watchlist = list(train = dtrain),
+      early_stopping_rounds = early_stopping_rounds,
+      verbose = 0
+    )
+    
+    # Store out-of-sample predictions
+    oos_pred[test_idx] <- predict(model, dtest)
+  }
+  
+  return(oos_pred)
+}
 
 
 inv_update = function(inv_x, w, x, sign){
@@ -407,9 +455,11 @@ Posterior = function(train.index, tau, X, R, W, Ex){
   mean = 0 # mean(res)
   std = std(res)
   
-  z.1 = pmax(pmin((R - (1-Ex)*tau - mean)/std,4),-4)
-  z.0 =  pmax(pmin((R - (0-Ex)*tau - mean)/std,4),-4)
-  
+  # z.1 = pmax(pmin((R - (1-Ex)*tau - mean)/std,4),-4)
+  # z.0 =  pmax(pmin((R - (0-Ex)*tau - mean)/std,4),-4)
+  z.1 = pmax(pmin((R - (1-Ex)*tau - mean)/std,4),-100) / 3 #???
+  z.0 =  pmax(pmin((R - (0-Ex)*tau - mean)/std,4),-100) / 3
+
   p.zxy.1 = Ex*dnorm(z.1)
   p.zxy.0 = (1-Ex)*dnorm(z.0)
   
