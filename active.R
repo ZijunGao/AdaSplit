@@ -1,7 +1,6 @@
+source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper Yao.R")
 
-#source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper Yao.R")
-
-source("/Users/yaozhang/Documents/GitHub/Panning/helper Yao.R")
+# source("/Users/yaozhang/Documents/GitHub/Panning/helper Yao.R")
 
 set.seed(318)
 
@@ -131,7 +130,7 @@ cat("\n")
 
 
 # Generate the Boxplots
-pdf(paste0("Comparison_setting_", setting, ".pdf"), width = 13, height = 6)
+# pdf(paste0("Comparison_setting_", setting, ".pdf"), width = 13, height = 6)
 
 p_values_df_art <- as.data.frame(simulation_results_art)
 p_values_df_ssrt <- as.data.frame(simulation_results_ssrt)
@@ -177,7 +176,7 @@ legend("topright", legend = c("ART", "SSRT"), fill = c("lightblue", "grey"),
        bg = "white") 
 
 
-dev.off()
+# dev.off()
 
 
 
