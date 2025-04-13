@@ -5,7 +5,6 @@ source("/Users/yaozhang/Documents/GitHub/Panning/helper Yao.R")
 
 set.seed(318)
 
-
 setting = 2
 n = 300 #sample size
 Group.number = 5 # total number of groups

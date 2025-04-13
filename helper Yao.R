@@ -53,26 +53,21 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
     IW = p.test/pmax(p.train,p)*p.train.marginal/p.test.marginal
   }else{
     IW = rep(1,n)
+    IW[train.index] = 1/length(train.index)
+    IW[test.index] = 1/length(test.index)
   }
+
 
   XX <- cbind(1, rbind(X,X))
   W1 = W1_ = Ex**2 ; W2 = W2_ =  (1 - Ex)**2
   W1_[train.index] = W[train.index] * W1[train.index] * IW[train.index]
-  W1_[test.index] =  W1[test.index]*Q[test.index]
-
+  W1_[test.index] =  W1[test.index]*Q[test.index]* IW[test.index]
+  
   W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
-  W2_[test.index] = W2[test.index]*(1-Q[test.index])
+  W2_[test.index] = W2[test.index]*(1-Q[test.index])* IW[test.index]
   
-  if (weighting){
-    inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
-    beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
-  }else{
-    
-    beta = rowSums(inv_XTWX_X * rep(c(W1_,W2_)*c( R/(1 - Ex),  R/(0 - Ex)), each = nrow(inv_XTWX_X)))
-   
-  }
-  
-  
+  inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
+  beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
 
   return(beta)
 }
