@@ -7,7 +7,7 @@ set.seed(318)
 
 
 setting = 2
-n = 400 #sample size
+n = 300 #sample size
 Group.number = 5 # total number of groups
 delta = 0.5 # effect size
 sigma = 0.2 # std of noise
