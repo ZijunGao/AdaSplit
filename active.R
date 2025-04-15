@@ -40,7 +40,7 @@ for (j in 1:n_trial){
   X[,2] = (X[,2]>0.75)
   mu = X %*%rnorm(num_features, 1, 1)
   tau = X[,setting]*delta
-  
+
   mu0 <- mu - Ex * tau
   mu1 <- mu0 + tau
   

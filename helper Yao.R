@@ -33,11 +33,11 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   mu0.hat <- mu - Ex * tau.imputed
   mu1.hat <- mu0.hat + tau.imputed
   
-  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed))
+  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, beta = beta.imputed))
 }
 
 
-Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FALSE){
+Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FALSE, marginalize = T){
 
   n = length(W)
   k = sum(A[1,]) 
@@ -62,11 +62,11 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
   XX <- cbind(1, rbind(X,X))
   W1 = W1_ = Ex**2 ; W2 = W2_ =  (1 - Ex)**2
   W1_[train.index] = W[train.index] * W1[train.index] * IW[train.index]
-  W1_[test.index] =  W1[test.index]*Q[test.index]* IW[test.index]
+  W1_[test.index] =  W1[test.index]*Q[test.index]* IW[test.index] * marginalize
   
   W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
-  W2_[test.index] = W2[test.index]*(1-Q[test.index])* IW[test.index]
-  
+  W2_[test.index] = W2[test.index]*(1-Q[test.index])* IW[test.index] * marginalize
+
   inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
   beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
 
@@ -74,7 +74,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
 }
 
 
-nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01, robust = F...){
+nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01, robust = F, marginalize = T, ...){
   
   # Y is an n-dimensional outcome matrix
   # X is an n x d covariate matrix 
@@ -134,7 +134,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   # Compute Imputed OLS
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
@@ -147,7 +147,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
 
   
   while ( length(train.index) < ceiling(proportion * n) ) {
-    if(epoch %% 10 == 0){print(epoch)}
+    # if(epoch %% 10 == 0){print(epoch)}
     epoch <- epoch + 1
     
     mu0.hat <- mu - Ex * tau.imputed
@@ -218,7 +218,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     if (epoch %% 20 ==0){
       
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
-    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A)
+    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
     tau.imputed = cbind(1, X) %*% beta.imputed
 
     # Compute the estimator change due to the new data point
@@ -243,7 +243,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
   
-  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index)) 
+  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index, beta = beta.imputed)) 
 }
 
 
