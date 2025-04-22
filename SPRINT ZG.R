@@ -61,7 +61,7 @@ table(Group)
 X = as.matrix(X)
 Ex = rep(0.5, n)
 
-M = 1000 # number of permutations
+M = 2000 # number of permutations
 proportion = 0.5 # proportion of randomness in the nuisance fold
 test.stats.method ="AIPW" # test statistics
 
@@ -70,6 +70,7 @@ set.seed(318) # 318; 813; 123
 mu.hat = nuisance.mu.xgboost(Y, X) # random forests
 
 # Randomization test
+set.seed(318) 
 tau.hat.active = nuisance.tau.active(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, Group = Group, proportion = proportion, robust = T) # estimate tau using active learning; robust = T, use power = -(TE^2)^2, and throw the point with the maximal power to the nuisance fold.
 train.index.active = tau.hat.active$train.index # the data points fitted to the nuisance
 test.index.active = setdiff(1:n,train.index.active) # the data points used for inference
@@ -84,7 +85,7 @@ test.stats.value.active = test.stats.group(Y = Y[test.index.active],
                                            mu1.hat = tau.hat.active$mu1[test.index.active], mu.hat = mu.hat[test.index.active], 
                                            tau.hat = tau.hat.active$tau[test.index.active])
 
-test.stats.ref.active = t(replicate(M, test.stats.group(Y = Y[test.index.active], 
+test.stats.ref.active = t(replicate(M, test.stats.group(Y = Y[test.index.active],
                                                         W =  W[test.index.active], 
                                                         Group = Group[test.index.active], 
                                                         stats = test.stats.method, 
@@ -102,7 +103,7 @@ p.value.active = sapply(seq(1, length(test.stats.value.active)), function(x) {su
 
 
 set.seed(318)
-m.pass = 10
+m.pass = 1
 p.value.ss = matrix(0, nrow = m.pass, ncol = Group.number)
 for(i in 1 : m.pass){
   # Sample splitting
@@ -115,7 +116,7 @@ for(i in 1 : m.pass){
   # Randomization tests
   test.stats.value = test.stats.group(Y = Y[test.index.ss], 
                                       W = W[test.index.ss], 
-                                      Group = Group[test.index.ss], 
+                                       Group = Group[test.index.ss], 
                                       stats = test.stats.method, 
                                       Ex = Ex[test.index.ss], 
                                       mu0.hat = tau.hat.ss$mu0[test.index.ss], 
@@ -207,6 +208,11 @@ p.value.baseline = (sapply(seq(1, length(test.stats.value.baseline)), function(x
   
 
 # result
+# X$High.risk.group = (X$RISK10YRS > 18) # 18 
+# X$Senior.group = (X$AGE > 70) # 70
+# X$Obese.group = (X$BMI > 27) # 27
+# Group = X$Obese.group * 4 + X$Senior.group * 2 + X$High.risk.group
+names(p.value.baseline) = names(p.value.dd) = names(p.value.active) = colnames(p.value.ss) = paste(rep(c("BMI < 27", "BMI > 27"),  times=c(4,4)), rep(c("junior", "senior"),  times=c(2,2)), c("low risk", "high risk"))
 record = list(); record$pValue = list()
 record$pValue$RT = p.value.baseline
 record$pValue$SS = p.value.ss

@@ -10,11 +10,11 @@ myHeatmap = function(data, title = ""){
   p = ggplot(data, aes(x = Var2, y = Var1, fill = value)) +
   geom_tile() +
   scale_fill_gradientn(
-    colors = c("red", "lightcoral", "lightgrey", "lightblue"),
+    colors = c("firebrick3", "lightcoral", "lightgrey", "lightblue", "deepskyblue4"),
     trans = "log",
-    breaks = c(0.1, 0.4, 1),
-    labels = c("0.1", "0.4", "1"),
-    limits = c(0.005, 1)
+    breaks = c(0.05, 0.1, 0.5, 1),
+    labels = c("0.05", "0.1", "0.5", "1"),
+    limits = c(0.0075, 1)
   ) +
   geom_text(aes(label = round(value, 2))) +
   labs(title = title, x = "", y = "") +
@@ -22,7 +22,7 @@ myHeatmap = function(data, title = ""){
   return(p)
 }
 
-setting = c("SPRINT")
+setting = c("SPRINT0421")
 record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
 
 # X$High.risk.group = (X$RISK10YRS > 18) # 18 

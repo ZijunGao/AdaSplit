@@ -132,7 +132,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
-  loss <- 1; window_size <- 10; loss_threshold <- 0.01
+  loss <- 1; window_size <- 10; loss_threshold <- 0.1
   loss_history <- rep(Inf, window_size)
   epoch <- 0
   stop = FALSE
@@ -211,7 +211,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     tau.copy = tau.imputed
     
     
-    if (epoch %% 10 ==0){
+    if (epoch %% 20 ==0){ # 10
     
       
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
@@ -239,14 +239,15 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
   }
   
-  test.index.move = test.index[tau.imputed[test.index]<0]
-  train.index = c(train.index, test.index.move)
-  test.index = setdiff(1:n, train.index)
-  
-  Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
-  tau.imputed = cbind(1, X) %*% beta.imputed
-  
+  if(!robust){
+    test.index.move = test.index[tau.imputed[test.index]<0]
+    train.index = c(train.index, test.index.move)
+    test.index = setdiff(1:n, train.index)
+    
+    Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
+    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
+    tau.imputed = cbind(1, X) %*% beta.imputed
+  }
   
   cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
   
