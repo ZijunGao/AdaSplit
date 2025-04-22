@@ -22,10 +22,6 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   beta = inv_XTWX %*% XTWR
   tau = cbind(1, X) %*% beta
   
-  #X_ = cbind(1, X)
-  #inv_XTWX = solve(t(X_) %*% diag(c(((W-Ex)**2 ))) %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
-  #inv_XTWX_X = inv_XTWX %*% t(cbind(1, rbind(X,X)))
-  
   Q = Posterior(train.index, tau, X, R, W, Ex)
   beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, marginalize = marginalize)
   tau.imputed = cbind(1, X) %*% beta.imputed
@@ -54,8 +50,6 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
     IW = p.test/pmax(p.train,p)*p.train.marginal/p.test.marginal
   }else{
     IW = rep(1,n)
-    IW[train.index] = 1/length(train.index)
-    IW[test.index] = 1/length(test.index)
   }
 
 
@@ -138,7 +132,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
-  loss <- 1; window_size <- 5; loss_threshold <- 0.1
+  loss <- 1; window_size <- 100; loss_threshold <- 0.01
   loss_history <- rep(Inf, window_size)
   epoch <- 0
   stop = FALSE
@@ -158,32 +152,32 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     power = numeric(n)
     
     
-    for (g in Group.idx){
-
-      index.g = which(Group == g)
-      test.index.g = intersect(test.index, index.g)
-      qte.g = Q[test.index.g]*TE[test.index.g]
-      ete.g = Ex[test.index.g]*TE[test.index.g]
-      vqte.g = Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2
-      vete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
-      # vqte.g = rep(mean(Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2), length(test.index.g)) # to be deleted
-      # vete.g = rep(mean(Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2), length(test.index.g)) # to be deleted
+    #for (g in Group.idx){
+    #
+    #  index.g = which(Group == g)
+    #  test.index.g = intersect(test.index, index.g)
+    #  qte.g = Q[test.index.g]*TE[test.index.g]
+    #  ete.g = Ex[test.index.g]*TE[test.index.g]
+    #  vqte.g = Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2
+    #  vete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
       
-      qte.sum = sum(qte.g); ete.sum = sum(ete.g)
-      vqte.g.sum = sum(vqte.g); vete.g.sum = sum(vete.g)
+    #  qte.sum = sum(qte.g); ete.sum = sum(ete.g)
+    #  vqte.g.sum = sum(vqte.g); vete.g.sum = sum(vete.g)
 
-      power.g = pnorm((qte.sum - ete.sum)/sqrt(vqte.g.sum + vete.g.sum))
-      power = power + power.g
+    #  power.g = pnorm((qte.sum - ete.sum)/sqrt(vqte.g.sum + vete.g.sum))
+    #  power = power + power.g
 
-      add.g = pnorm((qte.sum - ete.sum - qte.g + ete.g)/sqrt( (vqte.g.sum- vqte.g) + (vete.g.sum - vete.g)))
-      power[test.index.g] = power[test.index.g] - power.g + add.g  #sum up the power of all CRTs
-    }
+    #  add.g = pnorm((qte.sum - ete.sum - qte.g + ete.g)/sqrt( (vqte.g.sum- vqte.g) + (vete.g.sum - vete.g)))
+    #  power[test.index.g] = power[test.index.g] - power.g + add.g  #sum up the power of all CRTs
+    #}
 
-      
+    power = abs(Q - Ex)
+    power[tau.imputed<=0] = -1/power
     power = power[test.index]
-    #Compute weighted and Standardized objective function 
-   
+
+    if(robust){power = (TE^2)[test.index]}
   
+    
     # Find out the proportion of inference units in each group
     prop.group.test = prop.group(Group, Group.idx,test.index)
     
@@ -202,8 +196,9 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       # Otherwise, select the best point from the groups with enough proportions
       idx = which(Group[test.index] %in% Group.0)
     }
-    if(robust){power = -(TE^2)[test.index.g]}
-    new = test.index[idx][which.max(power[idx])]
+    
+
+    new = test.index[idx][which.min(power[idx])]
     
     # Update the indices of the nuisance and inference folds
     train.index = c(train.index, new)
@@ -215,7 +210,6 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     beta.copy = beta.imputed
     tau.copy = tau.imputed
     
-    if (epoch %% 20 ==0){
       
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
     beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
@@ -226,20 +220,27 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     #loss = sum((beta.imputed - beta.copy)**2)/sum(beta.copy**2)
     
     loss_history <- c(loss_history[-1], loss)
-    ave_loss <- max(loss_history)
+    max_loss <- max(loss_history)
 
     if (epoch >= window_size) {
-      #
-      if (ave_loss < loss_threshold) { 
+      if (max_loss < loss_threshold) { 
         stop =TRUE
         break
       }
     }
     
-    }
     if (stop){break} 
     
   }
+  
+  test.index.move = test.index[tau.imputed[test.index]<0]
+  train.index = c(train.index, test.index.move)
+  test.index = setdiff(1:n, train.index)
+  
+  Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
+  tau.imputed = cbind(1, X) %*% beta.imputed
+  
   
   cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
   
@@ -452,10 +453,8 @@ Posterior = function(train.index, tau, X, R, W, Ex){
   mean = 0 # mean(res)
   std = std(res)
   
-  # z.1 = pmax(pmin((R - (1-Ex)*tau - mean)/std,4),-4)
-  # z.0 =  pmax(pmin((R - (0-Ex)*tau - mean)/std,4),-4)
-  z.1 = pmax(pmin((R - (1-Ex)*tau - mean)/std,4),-100) / 3 #???
-  z.0 =  pmax(pmin((R - (0-Ex)*tau - mean)/std,4),-100) / 3
+  z.1 = pmax(pmin((R - (1-Ex)*tau - mean)/std,4),-4)
+  z.0 =  pmax(pmin((R - (0-Ex)*tau - mean)/std,4),-4)
 
   p.zxy.1 = Ex*dnorm(z.1)
   p.zxy.0 = (1-Ex)*dnorm(z.0)
