@@ -132,7 +132,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
-  loss <- 1; window_size <- 100; loss_threshold <- 0.01
+  loss <- 1; window_size <- 10; loss_threshold <- 0.01
   loss_history <- rep(Inf, window_size)
   epoch <- 0
   stop = FALSE
@@ -210,6 +210,9 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     beta.copy = beta.imputed
     tau.copy = tau.imputed
     
+    
+    if (epoch %% 10 ==0){
+    
       
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
     beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
@@ -227,6 +230,9 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
         stop =TRUE
         break
       }
+    }
+    
+    
     }
     
     if (stop){break} 
