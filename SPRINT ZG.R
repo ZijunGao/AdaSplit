@@ -57,6 +57,7 @@ X$Senior.group = (X$AGE > 70) # 70
 X$Obese.group = (X$BMI > 27) # 27
 Group = X$Obese.group * 4 + X$Senior.group * 2 + X$High.risk.group
 X$Senior.group = NULL; X$Obese.group = NULL; X$High.risk.group = NULL
+table(Group)
 X = as.matrix(X)
 Ex = rep(0.5, n)
 
@@ -211,7 +212,16 @@ record$pValue$RT = p.value.baseline
 record$pValue$SS = p.value.ss
 record$pValue$DD = p.value.dd
 record$pValue$ART = p.value.active
+
+# FWER
+q = 0.3
+record$R$RT = sum((p.adjust(record$pValue$RT, method = "holm") <= q))
+record$R$SS = sum((p.adjust(record$pValue$SS[1,], method = "holm") <= q)) # use the first run
+record$R$DD = sum((p.adjust(record$pValue$DD, method = "holm") <= q))
+record$R$ART = sum((p.adjust(record$pValue$ART, method = "holm") <= q))
+
 print(record)
+
 
 # saveRDS
 # saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT.rds")

@@ -7,7 +7,7 @@ library(pracma)
 library(Matrix)
 
 
-nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, train.index = NULL, k=20,...){
+nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, train.index = NULL, k=20, marginalize = T, ...){
   
   # initial fit
   n = length(Y)
@@ -27,7 +27,7 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   #inv_XTWX_X = inv_XTWX %*% t(cbind(1, rbind(X,X)))
   
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, marginalize = marginalize)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   mu0.hat <- mu - Ex * tau.imputed
@@ -63,7 +63,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
   W1 = W1_ = Ex**2 ; W2 = W2_ =  (1 - Ex)**2
   W1_[train.index] = W[train.index] * W1[train.index] * IW[train.index]
   W1_[test.index] =  W1[test.index]*Q[test.index]* IW[test.index] * marginalize
-  
+
   W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
   W2_[test.index] = W2[test.index]*(1-Q[test.index])* IW[test.index] * marginalize
 
@@ -348,9 +348,6 @@ test.stats.group = function(Y, W, Group, stats = "AIPW", Ex = NULL, mu0.hat = NU
   # Return the computed values for each group level
   return(values)
 }
-
-
-
 
 
 nuisance.mu = function(Y = NULL, X = NULL) {

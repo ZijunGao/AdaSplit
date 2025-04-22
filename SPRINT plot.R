@@ -1,6 +1,6 @@
 # plot for SPRINT data
 path = "~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025"
-plotDirectory = file.path("~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025")
+plotDirectory = file.path("~/Desktop/Research/Yao/HTE inference/code/Panning")
 
 library(ggplot2)
 library(reshape2)
@@ -31,81 +31,80 @@ record = readRDS(file.path(path, paste(setting, "rds", sep = ".")))
 # Group = X$Obese.group * 4 + X$Senior.group * 2 + X$High.risk.group
 
 # RT
-plot.data.merged = rbind(c(array(record$pValue$RT, dim = c(2,2,2))[,,1]), c(array(record$pValue$RT, dim = c(2,2,2))[,,2]))
-colnames(plot.data.merged) = c("Young; Low Risk", "Senior; Low Risk", "Young; High Risk", "Senior; High Risk")
-rownames(plot.data.merged) = c("BMI < 27", "BMI > 27")
+plot.data.merged = rbind(c(array(record$pValue$RT, dim = c(2,2,2))[,2,]), c(array(record$pValue$RT, dim = c(2,2,2))[,1,]))
+colnames(plot.data.merged) = c("Low Risk; BMI < 27", "High Risk; BMI < 27", "Low Risk; BMI > 27", "High Risk;BMI > 27")
+rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
-plot.data.merged = t(plot.data.merged)
+plot.data.merged = t(plot.data.merged)[,c(2,1)]
 heatmap.RT.merged = myHeatmap(data = melt(plot.data.merged), title = "RT")
+heatmap.RT.merged
 
-plot.data = array(record$pValue$RT, dim = c(2,2,2))[,,1]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.RT.normal = myHeatmap(data = melt(plot.data), title = "RT; Normal")
-
-plot.data = array(record$pValue$RT, dim = c(2,2,2))[,,2]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.RT.overweight = myHeatmap(data = melt(plot.data), title = "RT; Overweight")
+# plot.data = array(record$pValue$RT, dim = c(2,2,2))[,,1]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.RT.normal = myHeatmap(data = melt(plot.data), title = "RT; Normal")
+# plot.data = array(record$pValue$RT, dim = c(2,2,2))[,,2]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.RT.overweight = myHeatmap(data = melt(plot.data), title = "RT; Overweight")
 
 # SSRT
 index = 1
-plot.data.merged = rbind(c(array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,1]), c(array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,2]))
-colnames(plot.data.merged) = c("Young; Low Risk", "Senior; Low Risk", "Young; High Risk", "Senior; High Risk")
-rownames(plot.data.merged) = c("BMI < 27", "BMI > 27")
+plot.data.merged = rbind(c(array(record$pValue$SSRT[index,], dim = c(2,2,2))[,2,]), c(array(record$pValue$SSRT[index,], dim = c(2,2,2))[,1,]))
+colnames(plot.data.merged) = c("Low Risk; BMI < 27", "High Risk; BMI < 27", "Low Risk; BMI > 27", "High Risk;BMI > 27")
+rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
-plot.data.merged = t(plot.data.merged)
-heatmap.SSRT.merged = myHeatmap(data = melt(plot.data.merged), title = "SSRT")
+plot.data.merged = t(plot.data.merged)[,c(2,1)]
+heatmap.SSRT.merged = myHeatmap(data = melt(plot.data.merged), title = "RRT")
+heatmap.SSRT.merged
 
-plot.data = array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,1]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.SSRT.normal = myHeatmap(data = melt(plot.data), title = "SSRT; Normal")
-
-plot.data = array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,2]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.SSRT.overweight = myHeatmap(data = melt(plot.data), title = "SSRT; Overweight")
+# plot.data = array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,1]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.SSRT.normal = myHeatmap(data = melt(plot.data), title = "RRT; Normal")
+# plot.data = array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,2]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.SSRT.overweight = myHeatmap(data = melt(plot.data), title = "RRT; Overweight")
 
 # ART
-plot.data.merged = rbind(c(array(record$pValue$ART, dim = c(2,2,2))[,,1]), c(array(record$pValue$ART, dim = c(2,2,2))[,,2]))
-colnames(plot.data.merged) = c("Young; Low Risk", "Senior; Low Risk", "Young; High Risk", "Senior; High Risk")
-rownames(plot.data.merged) = c("BMI < 27", "BMI > 27")
+plot.data.merged = rbind(c(array(record$pValue$ART, dim = c(2,2,2))[,2,]), c(array(record$pValue$ART, dim = c(2,2,2))[,1,]))
+colnames(plot.data.merged) = c("Low Risk; BMI < 27", "High Risk; BMI < 27", "Low Risk; BMI > 27", "High Risk;BMI > 27")
+rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
-plot.data.merged = t(plot.data.merged)
+plot.data.merged = t(plot.data.merged)[,c(2,1)]
 heatmap.ART.merged = myHeatmap(data = melt(plot.data.merged), title = "ART")
+heatmap.ART.merged 
 
-plot.data = array(record$pValue$ART, dim = c(2,2,2))[,,1]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.ART.normal = myHeatmap(data = melt(plot.data), title = "ART; Normal")
-
-plot.data = array(record$pValue$ART, dim = c(2,2,2))[,,2]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.ART.overweight = myHeatmap(data = melt(plot.data), title = "ART; Overweight")
+# plot.data = array(record$pValue$ART, dim = c(2,2,2))[,,1]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.ART.normal = myHeatmap(data = melt(plot.data), title = "ART; Normal")
+# plot.data = array(record$pValue$ART, dim = c(2,2,2))[,,2]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.ART.overweight = myHeatmap(data = melt(plot.data), title = "ART; Overweight")
 
 # DDRT
-plot.data.merged = rbind(c(array(record$pValue$DDRT, dim = c(2,2,2))[,,1]), c(array(record$pValue$DDRT, dim = c(2,2,2))[,,2]))
-colnames(plot.data.merged) = c("Young; Low Risk", "Senior; Low Risk", "Young; High Risk", "Senior; High Risk")
-rownames(plot.data.merged) = c("BMI < 27", "BMI > 27")
+plot.data.merged = rbind(c(array(record$pValue$DDRT, dim = c(2,2,2))[,2,]), c(array(record$pValue$DDRT, dim = c(2,2,2))[,1,]))
+colnames(plot.data.merged) = c("Low Risk; BMI < 27", "High Risk; BMI < 27", "Low Risk; BMI > 27", "High Risk;BMI > 27")
+rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
-plot.data.merged = t(plot.data.merged)
+plot.data.merged = t(plot.data.merged)[,c(2,1)]
 heatmap.DDRT.merged = myHeatmap(data = melt(plot.data.merged), title = "DDRT")
-
-plot.data = array(record$pValue$DDRT, dim = c(2,2,2))[,,1]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.DDRT.normal = myHeatmap(data = melt(plot.data), title = "DDRT; Normal")
-
-plot.data = array(record$pValue$DDRT, dim = c(2,2,2))[,,2]
-colnames(plot.data) = c("Young", "Senior")
-rownames(plot.data) = c("Low Risk", "High Risk")
-heatmap.DDRT.overweight = myHeatmap(data = melt(plot.data), title = "DDRT; Overweight")
-
 heatmap.ART.merged
+
+# plot.data = array(record$pValue$DDRT, dim = c(2,2,2))[,,1]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.DDRT.normal = myHeatmap(data = melt(plot.data), title = "DDRT; Normal")
+# plot.data = array(record$pValue$DDRT, dim = c(2,2,2))[,,2]
+# colnames(plot.data) = c("Young", "Senior")
+# rownames(plot.data) = c("Low Risk", "High Risk")
+# heatmap.DDRT.overweight = myHeatmap(data = melt(plot.data), title = "DDRT; Overweight")
+
 # Arrange the two heatmaps side by side
-# pdf(file = paste(plotDirectory, "/", setting, "Heatmap.pdf", sep = ""), width = 7.5, height = 7)
+# pdf(file = paste(plotDirectory, "/", setting, "Heatmap.pdf", sep = ""), width = 8, height = 3)
 # Arrange 1
 # grid.arrange(heatmap.RT.normal,
 #              heatmap.SSRT.normal,
@@ -121,14 +120,21 @@ heatmap.ART.merged
 # dev.off()
 
 
-# pdf(file = paste(plotDirectory, "/", setting, "Heatmap.pdf", sep = ""), width = 7.5, height = 7)
+methods = c("RT", "RRT", "ART")
+count=count + 1
+method = methods[1]
+# pdf(file = paste(plotDirectory, "/", setting," ", method, " Heatmap.pdf", sep = ""), width = 4, height = 4)
 # Arrange 1
 # grid.arrange(heatmap.RT.merged,
 #              heatmap.SSRT.merged,
 #              heatmap.ART.merged,
 #              heatmap.DDRT.merged, ncol = 2, nrow = 2)
 # Arrange 2
-grid.arrange(heatmap.RT.merged,
-             heatmap.SSRT.merged,
-             heatmap.ART.merged, ncol = 3, nrow = 1)
+# grid.arrange(heatmap.RT.merged,
+#              heatmap.SSRT.merged,
+#              heatmap.ART.merged, ncol = 3, nrow = 1)
+# Separate
+# heatmap.RT.merged
+# heatmap.SSRT.merged
+heatmap.ART.merged
 # dev.off()
