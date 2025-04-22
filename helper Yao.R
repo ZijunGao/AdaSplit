@@ -133,6 +133,14 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   # Set the stopping rule
   loss <- 1; window_size <- 10; loss_threshold <- 0.1
+  
+  if(robust){
+    epoch.gap = 20
+  }else{
+    epoch.gap = 10
+  }
+  
+  
   loss_history <- rep(Inf, window_size)
   epoch <- 0
   stop = FALSE
@@ -211,7 +219,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     tau.copy = tau.imputed
     
     
-    if (epoch %% 20 ==0){ # 10
+    if (epoch %% epoch.gap ==0){
     
       
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
@@ -240,7 +248,17 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   }
   
   if(!robust){
-    test.index.move = test.index[tau.imputed[test.index]<0]
+    
+    #compute the inference proportion of each group
+    prop.group.test = prop.group(Group, Group.idx, test.index)
+    #choose the groups with enough proportion
+    B = prop.group.test > (1-proportion)
+    Group.0 = Group.idx[B]
+    #collect the units in these groups
+    idx = which(Group[test.index] %in% Group.0)
+    
+    #collect the units that will move from inference to nuisance
+    test.index.move = test.index[idx][tau.imputed[test.index[idx]]<0]
     train.index = c(train.index, test.index.move)
     test.index = setdiff(1:n, train.index)
     
