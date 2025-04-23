@@ -37,7 +37,7 @@ rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
 plot.data.merged = t(plot.data.merged)[,c(2,1)]
 heatmap.RT.merged = myHeatmap(data = melt(plot.data.merged), title = "RT")
-heatmap.RT.merged
+# heatmap.RT.merged
 
 # plot.data = array(record$pValue$RT, dim = c(2,2,2))[,,1]
 # colnames(plot.data) = c("Young", "Senior")
@@ -56,7 +56,7 @@ rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
 plot.data.merged = t(plot.data.merged)[,c(2,1)]
 heatmap.SSRT.merged = myHeatmap(data = melt(plot.data.merged), title = "RRT")
-heatmap.SSRT.merged
+# heatmap.SSRT.merged
 
 # plot.data = array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,1]
 # colnames(plot.data) = c("Young", "Senior")
@@ -74,7 +74,7 @@ rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
 plot.data.merged = t(plot.data.merged)[,c(2,1)]
 heatmap.ART.merged = myHeatmap(data = melt(plot.data.merged), title = "ART")
-heatmap.ART.merged 
+# heatmap.ART.merged 
 
 # plot.data = array(record$pValue$ART, dim = c(2,2,2))[,,1]
 # colnames(plot.data) = c("Young", "Senior")
@@ -92,7 +92,7 @@ rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
 plot.data.merged = t(plot.data.merged)[,c(2,1)]
 heatmap.DDRT.merged = myHeatmap(data = melt(plot.data.merged), title = "DDRT")
-heatmap.ART.merged
+# heatmap.DDRT.merged
 
 # plot.data = array(record$pValue$DDRT, dim = c(2,2,2))[,,1]
 # colnames(plot.data) = c("Young", "Senior")
@@ -120,10 +120,10 @@ heatmap.ART.merged
 # dev.off()
 
 
-methods = c("RT", "RRT", "ART")
+methods = c("RT", "RRT", "ART", "DDRT")
 count=count + 1
-method = methods[1]
-# pdf(file = paste(plotDirectory, "/", setting," ", method, " Heatmap.pdf", sep = ""), width = 4, height = 4)
+method = methods[count]
+pdf(file = paste(plotDirectory, "/", "SPRINT"," ", method, " Heatmap.pdf", sep = ""), width = 4, height = 4)
 # Arrange 1
 # grid.arrange(heatmap.RT.merged,
 #              heatmap.SSRT.merged,
@@ -136,5 +136,6 @@ method = methods[1]
 # Separate
 # heatmap.RT.merged
 # heatmap.SSRT.merged
-heatmap.ART.merged
-# dev.off()
+# heatmap.ART.merged
+# heatmap.DDRT.merged
+dev.off()

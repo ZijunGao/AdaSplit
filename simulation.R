@@ -13,7 +13,7 @@ sigma = 1 # std of noise: 1, sqrt(2)
 M = 1000 # number of permutations
 proportion = 0.5 # proportion of randomness in the nuisance fold
 test.stats.method ="AIPW" # test statistics
-n_trial = 100 # number of runs; 20; 100
+n_trial = 10 # number of runs; 20; 100
 verbose = F # if true, print out intermediate results
 q = 0.2 # FWER level
 marginalize = T # if marginalize
@@ -32,7 +32,7 @@ settings = c("default",
              "null more repeats",
              "no marginalization larger sample size",
              "no marginalization larger noise")
-setting = settings[13]
+setting = settings[2]
 if(setting == "larger sample size"){n = 1000}
 if(setting == "larger noise"){sigma = sqrt(2)}
 if(setting == "even larger noise"){sigma = 2}
@@ -100,9 +100,9 @@ for (j in 1:n_trial){
   Group = S - 1
   G = model.matrix(~ factor(Group))[, -1]
   Ex = rep(0.5,n)
-  X[,2] = (X[,2]>0.75)
+  X[,4] = (X[,4]>0.75)
   mu = X %*%rnorm(num_features, 1, 1)
-  X[,3] = (X[,3]>0.25); tau = (X - 0.5) %*% rep(delta, num_features) + 0.5 * delta
+  X[,5] = (X[,5]>0.25); tau = (X - 0.5) %*% rep(delta, num_features) + 0.5 * delta
     
   mu0 <- mu - Ex * tau
   mu1 <- mu0 + tau
@@ -241,8 +241,6 @@ legend("topright", legend = c("RT", "SSRT", "ART"), fill = cols,
        bg = "white",
        horiz = T) 
 
-
-
 # results
 data.frame("Number of rejected subgroups" = lapply(R, mean))
 
@@ -264,10 +262,5 @@ record = list()
 record$pval = pval; record$R = R; record$R2 = R2; record$FWER = FWER
 record$inference.ATE = inference.ATE; record$inference.proportion = lapply(inference.proportion, function(x){x / (n / Group.number)})
 # saveRDS(record, file = paste(file.path(directory, setting), ".rds", sep = ""))
-
-
-
-
-
 
 

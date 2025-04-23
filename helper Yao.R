@@ -180,7 +180,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     #}
 
     power = abs(Q - Ex)
-    power[tau.imputed<=0] = -1/power
+    power[tau.imputed<=0] = -1/power[tau.imputed<=0]
     power = power[test.index]
 
     if(robust){power = (TE^2)[test.index]}
@@ -256,6 +256,13 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     Group.0 = Group.idx[B]
     #collect the units in these groups
     idx = which(Group[test.index] %in% Group.0)
+    
+    for (g in Group.0){
+      idx.g = which(Group[test.index]==g)
+      test.index.g = test.index[idx.g]
+      
+    }
+    
     
     #collect the units that will move from inference to nuisance
     test.index.move = test.index[idx][tau.imputed[test.index[idx]]<0]

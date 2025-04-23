@@ -47,7 +47,7 @@ Y = 1 - data$EVENT_PRIMARY
 d = ncol(X)
 n = nrow(X)
 
-set.seed(318) # 318; 123
+set.seed(318)
 index = seq(1, n) # seq(1, n); sample(n, 4000)
 X = X[index,]; Y = Y[index]; W = W[index]; n = length(index)
 # Group.number = 1; G = rep(0, n); Group = rep(0, n) # a single group
@@ -175,7 +175,6 @@ if(dim(test.stats.ref.dd)[1] == 1){test.stats.ref.dd = t(test.stats.ref.dd)}
 p.value.dd = sapply(seq(1, length(test.stats.value.dd)), function(x) { sum(test.stats.ref.dd[, x]>=test.stats.value.dd[x])/(M+1) + 1/(M+1)})
 
 
-
 # Baseline, not model-based
 set.seed(318)
 test.stats.value.baseline = test.stats.group(Y = Y, 
@@ -215,21 +214,21 @@ p.value.baseline = (sapply(seq(1, length(test.stats.value.baseline)), function(x
 names(p.value.baseline) = names(p.value.dd) = names(p.value.active) = colnames(p.value.ss) = paste(rep(c("BMI < 27", "BMI > 27"),  times=c(4,4)), rep(c("junior", "senior"),  times=c(2,2)), c("low risk", "high risk"))
 record = list(); record$pValue = list()
 record$pValue$RT = p.value.baseline
-record$pValue$SS = p.value.ss
-record$pValue$DD = p.value.dd
+record$pValue$SSRT = p.value.ss
+record$pValue$DDRT = p.value.dd
 record$pValue$ART = p.value.active
 
 # FWER
-q = 0.3
+q = 0.2
 record$R$RT = sum((p.adjust(record$pValue$RT, method = "holm") <= q))
-record$R$SS = sum((p.adjust(record$pValue$SS[1,], method = "holm") <= q)) # use the first run
-record$R$DD = sum((p.adjust(record$pValue$DD, method = "holm") <= q))
+record$R$SSRT = sum((p.adjust(record$pValue$SSRT[1,], method = "holm") <= q)) # use the first run
+record$R$DDRT = sum((p.adjust(record$pValue$DDRT, method = "holm") <= q))
 record$R$ART = sum((p.adjust(record$pValue$ART, method = "holm") <= q))
 
 print(record)
 
 
 # saveRDS
-# saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT.rds")
+# saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT0421.rds") # SPRINT.rds; SPRINT0421.rds
 # record = readRDS("~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT.rds")
 
