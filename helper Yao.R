@@ -132,12 +132,16 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
-  loss <- 1; window_size <- 10; loss_threshold <- 0.1
+  loss <- 1;
   
   if(robust){
+    window_size <- 10
     epoch.gap = 20
+    loss_threshold <- 0.1
   }else{
-    epoch.gap = 10
+    window_size <- 50
+    epoch.gap = 1
+    loss_threshold <- 0.01
   }
   
   
@@ -159,28 +163,8 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     # Predict the CRT's power loss after moving the j-th point from inference to nuisance estimation
     power = numeric(n)
     
-    
-    #for (g in Group.idx){
-    #
-    #  index.g = which(Group == g)
-    #  test.index.g = intersect(test.index, index.g)
-    #  qte.g = Q[test.index.g]*TE[test.index.g]
-    #  ete.g = Ex[test.index.g]*TE[test.index.g]
-    #  vqte.g = Q[test.index.g]*(1-Q[test.index.g])*TE[test.index.g]**2
-    #  vete.g = Ex[test.index.g]*(1-Ex[test.index.g])*TE[test.index.g]**2
-      
-    #  qte.sum = sum(qte.g); ete.sum = sum(ete.g)
-    #  vqte.g.sum = sum(vqte.g); vete.g.sum = sum(vete.g)
 
-    #  power.g = pnorm((qte.sum - ete.sum)/sqrt(vqte.g.sum + vete.g.sum))
-    #  power = power + power.g
-
-    #  add.g = pnorm((qte.sum - ete.sum - qte.g + ete.g)/sqrt( (vqte.g.sum- vqte.g) + (vete.g.sum - vete.g)))
-    #  power[test.index.g] = power[test.index.g] - power.g + add.g  #sum up the power of all CRTs
-    #}
-
-    power = abs(Q - Ex)
-    power[tau.imputed<=0] = -1/power[tau.imputed<=0]
+    power = abs(Ex - Q)*sign(tau.imputed)
     power = power[test.index]
 
     if(robust){power = (TE^2)[test.index]}
@@ -222,23 +206,23 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     if (epoch %% epoch.gap ==0){
     
       
-    Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
-    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
-    tau.imputed = cbind(1, X) %*% beta.imputed
-
-    # Compute the estimator change due to the new data point
-    loss = sum((tau.imputed[test.index]-tau.copy[test.index])**2)/sum((tau.copy-mean(tau.copy[test.index]))**2)
-    #loss = sum((beta.imputed - beta.copy)**2)/sum(beta.copy**2)
-    
-    loss_history <- c(loss_history[-1], loss)
-    max_loss <- max(loss_history)
-
-    if (epoch >= window_size) {
-      if (max_loss < loss_threshold) { 
-        stop =TRUE
-        break
+      Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
+      beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
+      tau.imputed = cbind(1, X) %*% beta.imputed
+  
+      # Compute the estimator change due to the new data point
+      loss = sum((tau.imputed[test.index]-tau.copy[test.index])**2)/sum((tau.copy-mean(tau.copy[test.index]))**2)
+      #loss = sum((beta.imputed - beta.copy)**2)/sum(beta.copy**2)
+      
+      loss_history <- c(loss_history[-1], loss)
+      max_loss <- max(loss_history)
+  
+      if (epoch >= window_size) {
+        if (max_loss < loss_threshold) { 
+          stop =TRUE
+          break
+        }
       }
-    }
     
     
     }
@@ -252,20 +236,24 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     #compute the inference proportion of each group
     prop.group.test = prop.group(Group, Group.idx, test.index)
     #choose the groups with enough proportion
-    B = prop.group.test > (1-proportion)
-    Group.0 = Group.idx[B]
+    prop.gap = prop.group.test - (1-proportion)
+    Group.0 = Group.idx[prop.gap > 0]
     #collect the units in these groups
     idx = which(Group[test.index] %in% Group.0)
     
+
+    test.index.move = NULL
+    
     for (g in Group.0){
+      size.g = sum(Group==g)
       idx.g = which(Group[test.index]==g)
       test.index.g = test.index[idx.g]
-      
+      num.negative =  sum(tau.imputed[test.index.g]<0)
+      top_indices <- order(tau.imputed[test.index.g],decreasing=FALSE)[1:min(num.negative,floor(size.g*prop.gap[g+1]))]
+ 
+      test.index.move = c(test.index.move,test.index.g[top_indices])
     }
     
-    
-    #collect the units that will move from inference to nuisance
-    test.index.move = test.index[idx][tau.imputed[test.index[idx]]<0]
     train.index = c(train.index, test.index.move)
     test.index = setdiff(1:n, train.index)
     
