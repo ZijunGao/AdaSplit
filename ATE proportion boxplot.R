@@ -13,7 +13,10 @@ settings <- c("default",
               "mu xgboost",
               "fewer for nuisance",
               "fewer for inference",
-              "null more repeats")
+              "null more repeats",
+              "no marginalization larger sample size",
+              "no marginalization larger noise",
+              "larger sample size no throw away")
 directory = "~/Desktop/Research/Yao/HTE inference/code/Panning" 
 
 record_default <- readRDS(file.path(directory, "April 2025", paste(settings[1], ".rds", sep = "")))
@@ -24,7 +27,7 @@ inference_art_default$Method <- "ART (n = 500)"
 
 # Load ART from "larger sample size"
 record_largern <- readRDS(file.path(directory, "April 2025", paste(settings[2], ".rds", sep = "")))
-inference_art_largern <- as.data.frame(record_largern$inference.proportion$ART)
+inference_art_largern <- as.data.frame(record_largern$inference.proportion.before.throw.away$ART)
 colnames(inference_art_largern) <- paste0("G", 1:Group.number)
 inference_art_largern$Method <- "ART (n = 1000)"
 
@@ -48,7 +51,8 @@ summary_df <- combined_long %>%
   )
 
 # Plot bar chart with ±1 SD error bars
-pdf(paste0(directory, "/inference_proportion_", setting, ".pdf"), width = 3, height = 3)
+pdf(paste0(directory, "/inference_proportion_", setting, "_no_throw_away.pdf"), width = 3, height = 3)
+# pdf(paste0(directory, "/inference_proportion_", setting, ".pdf"), width = 3, height = 3)
 ggplot(summary_df, aes(x = variable, y = mean, fill = Method)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.6), width = 0.5, color = "black") +
   geom_errorbar(

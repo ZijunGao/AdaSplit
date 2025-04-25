@@ -253,10 +253,9 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
  
       test.index.move = c(test.index.move,test.index.g[top_indices])
     }
-    
+    train.index.before.throw.away = train.index
     train.index = c(train.index, test.index.move)
     test.index = setdiff(1:n, train.index)
-    
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
     beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
     tau.imputed = cbind(1, X) %*% beta.imputed
@@ -264,7 +263,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
   
-  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index, beta = beta.imputed)) 
+  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index, beta = beta.imputed, train.index.before.throw.away = train.index.before.throw.away)) 
 }
 
 

@@ -21,7 +21,7 @@ settings = c("default",
              "fewer for inference",
              "null more repeats")
 
-count = 2 # "default": 1; "larger sample size": 2
+count = 1 # "default": 1; "larger sample size": 2
 setting = settings[count]
 record = readRDS(file.path(directory, "April 2025", paste(setting, ".rds", sep = "")))
 
@@ -52,7 +52,7 @@ ggplot(combined_inference_ate_long, aes(x = variable, y = value, fill = Method))
     width = 0.6
   ) +
   geom_hline(yintercept = 0.0, linetype = "dashed", color = "black", linewidth = 0.6) +  
-  ylim(-0.2, 1.4) +
+  ylim(-0.2, 1.5) +
   scale_fill_manual(
     values = c("RT" = "#A3C1AD", "SSRT" = "gold", "ART" = "#8C1515"),
     labels = c("RT" = "RT", "SSRT" = "RRT", "ART" = "ART")

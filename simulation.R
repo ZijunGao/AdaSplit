@@ -13,7 +13,7 @@ sigma = 1 # std of noise: 1, sqrt(2)
 M = 1000 # number of permutations
 proportion = 0.5 # proportion of randomness in the nuisance fold
 test.stats.method ="AIPW" # test statistics
-n_trial = 10 # number of runs; 20; 100
+n_trial = 3 # number of runs; 20; 100
 verbose = F # if true, print out intermediate results
 q = 0.2 # FWER level
 marginalize = T # if marginalize
@@ -32,7 +32,7 @@ settings = c("default",
              "null more repeats",
              "no marginalization larger sample size",
              "no marginalization larger noise")
-setting = settings[2]
+setting = settings[1]
 if(setting == "larger sample size"){n = 1000}
 if(setting == "larger noise"){sigma = sqrt(2)}
 if(setting == "even larger noise"){sigma = 2}
@@ -42,7 +42,7 @@ if(setting == "no marginalization"){marginalize = F}
 if(setting == "mu xgboost"){mu.learner = "xgboost"}
 if(setting == "fewer for nuisance"){proportion = 0.25}
 if(setting == "fewer for inference"){proportion = 0.75}
-if(setting == "null more repeats"){delta = 0; n = 2000; n_trial = 1000}
+if(setting == "null more repeats"){delta = 0; n = 2000; n_trial = 500}
 if(setting == "no marginalization larger sample size"){n = 1000; marginalize = F}
 if(setting == "no marginalization larger noise"){sigma = sqrt(2); marginalize = F}
 
@@ -67,6 +67,7 @@ R2 = list(); R2$ART = R2$SSRT = c()
 
 # Proportion of inference fold
 inference.proportion = list(); inference.proportion$ART = inference.proportion$SSRT = matrix(0, nrow = n_trial, ncol = Group.number)
+inference.proportion.before.throw.away = inference.proportion
 
 # Average treatment effect in the inference fold
 inference.ATE = list(); inference.ATE$ART = inference.ATE$SSRT = matrix(0, nrow = n_trial, ncol = Group.number)
@@ -163,7 +164,8 @@ for (j in 1:n_trial){
   tau.hat.adaptive = nuisance.tau.active(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, Group = Group, proportion = proportion, marginalize = marginalize) # estimate tau using active learning
   train.index.adaptive = tau.hat.adaptive$train.index # the data points fitted to the nuisance
   test.index.adaptive = setdiff(1:n,train.index.adaptive) # the data points used for inference
-  inference.proportion$ART[j,] = table(Group[test.index.adaptive])
+  inference.proportion$ART[j,] = table(Group[setdiff(1:n,tau.hat.adaptive$train.index)])
+  inference.proportion.before.throw.away$ART[j,] = table(Group[setdiff(1:n,tau.hat.adaptive$train.index.before.throw.away)])
   inference.ATE$ART[j,] = aggregate(tau[test.index.adaptive], by = list(Group[test.index.adaptive]), mean)$x
   
   v = sum((tau.val - cbind(1,X.val) %*% tau.hat.adaptive$beta)**2)/sum((tau.val - mean(tau.val))**2)
@@ -260,7 +262,7 @@ data.frame("RT" = round(colMeans(pval$RT[1:j,]),2),
 # save data
 record = list()
 record$pval = pval; record$R = R; record$R2 = R2; record$FWER = FWER
-record$inference.ATE = inference.ATE; record$inference.proportion = lapply(inference.proportion, function(x){x / (n / Group.number)})
+record$inference.ATE = inference.ATE; record$inference.proportion = lapply(inference.proportion, function(x){x / (n / Group.number)}); record$inference.proportion.before.throw.away = lapply(inference.proportion.before.throw.away, function(x){x / (n / Group.number)})
 # saveRDS(record, file = paste(file.path(directory, setting), ".rds", sep = ""))
 
 

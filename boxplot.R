@@ -13,10 +13,12 @@ settings = c("default",
              "mu xgboost",
              "fewer for nuisance",
              "fewer for inference",
-             "null more repeats")
+             "null more repeats",
+             "no marginalization larger sample size",
+             "no marginalization larger noise")
 
   count = count + 1
-  setting = settings[1]
+  setting = settings[count]
   record = readRDS(file.path(directory, "April 2025", paste(setting, ".rds", sep = "")))
   p_values_df_rt <- as.data.frame(record$pval$RT)
   p_values_df_ssrt <- as.data.frame(record$pval$SSRT)
