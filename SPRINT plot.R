@@ -55,7 +55,7 @@ colnames(plot.data.merged) = c("Low Risk; BMI < 27", "High Risk; BMI < 27", "Low
 rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
 plot.data.merged = t(plot.data.merged)[,c(2,1)]
-heatmap.SSRT.merged = myHeatmap(data = melt(plot.data.merged), title = "RRT")
+heatmap.SSRT.merged = myHeatmap(data = melt(plot.data.merged), title = "RT (RandomSplit)")
 # heatmap.SSRT.merged
 
 # plot.data = array(record$pValue$SSRT[index, ], dim = c(2,2,2))[,,1]
@@ -73,7 +73,7 @@ colnames(plot.data.merged) = c("Low Risk; BMI < 27", "High Risk; BMI < 27", "Low
 rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
 plot.data.merged = t(plot.data.merged)[,c(2,1)]
-heatmap.ART.merged = myHeatmap(data = melt(plot.data.merged), title = "ART")
+heatmap.ART.merged = myHeatmap(data = melt(plot.data.merged), title = "RT (AdaSplit)")
 # heatmap.ART.merged 
 
 # plot.data = array(record$pValue$ART, dim = c(2,2,2))[,,1]
@@ -91,7 +91,7 @@ colnames(plot.data.merged) = c("Low Risk; BMI < 27", "High Risk; BMI < 27", "Low
 rownames(plot.data.merged) = c("Senior", "Junior")
 # plot.data.merged = plot.data.merged[c(2,1),]
 plot.data.merged = t(plot.data.merged)[,c(2,1)]
-heatmap.DDRT.merged = myHeatmap(data = melt(plot.data.merged), title = "DDRT")
+heatmap.DDRT.merged = myHeatmap(data = melt(plot.data.merged), title = "RT (Double-dipping)")
 # heatmap.DDRT.merged
 
 # plot.data = array(record$pValue$DDRT, dim = c(2,2,2))[,,1]

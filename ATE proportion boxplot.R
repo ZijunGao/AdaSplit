@@ -15,8 +15,7 @@ settings <- c("default",
               "fewer for inference",
               "null more repeats",
               "no marginalization larger sample size",
-              "no marginalization larger noise",
-              "larger sample size no throw away")
+              "no marginalization larger noise")
 directory = "~/Desktop/Research/Yao/HTE inference/code/Panning" 
 
 record_default <- readRDS(file.path(directory, "April 2025", paste(settings[1], ".rds", sep = "")))
@@ -63,7 +62,8 @@ ggplot(summary_df, aes(x = variable, y = mean, fill = Method)) +
   geom_hline(yintercept = 0.5, linetype = "dashed", color = "black", linewidth = 0.6) +
   coord_cartesian(ylim = c(0.35, 0.98)) +
   scale_fill_manual(
-    values = c("ART (n = 500)" = "lightsalmon1", "ART (n = 1000)" = "red3")
+    values = c("ART (n = 500)"  = "lightsalmon1", "ART (n = 1000)" = "red3"),
+    labels = c("n = 500", "n = 1000")
   ) +
   labs(
     x = NULL,

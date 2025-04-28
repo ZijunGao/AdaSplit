@@ -16,7 +16,7 @@ settings = c("default",
              "null more repeats",
              "no marginalization larger sample size",
              "no marginalization larger noise")
-
+  # count = 0
   count = count + 1
   setting = settings[count]
   record = readRDS(file.path(directory, "April 2025", paste(setting, ".rds", sep = "")))
@@ -41,7 +41,7 @@ settings = c("default",
   )
   combined_p_values_long$variable <- factor(combined_p_values_long$variable, levels = paste("G", 1:Group.number, sep = ""))
   
-  pdf(paste0(directory, "/Comparison_setting_", setting, ".pdf"), width = 3, height = 3)
+  pdf(paste0(directory, "/Comparison_setting_", setting, ".pdf"), width = 5.5, height = 3)
   ggplot(combined_p_values_long, aes(x = variable, y = value, fill = Method)) +
     geom_boxplot(
       position = position_dodge(width = 0.75), 
@@ -51,7 +51,7 @@ settings = c("default",
     ) +
     scale_fill_manual(
       values = c("RT" = "#A3C1AD", "SSRT" = "gold", "ART" = "#8C1515"),
-      labels = c("RT" = "RT", "SSRT" = "RRT", "ART" = "ART")
+      labels = c("RT" = "RT", "SSRT" = "RT (RandomSplit)", "ART" = "RT (AdaSplit)")
     ) +
     labs(
       x = NULL,
@@ -62,7 +62,7 @@ settings = c("default",
     theme(
       axis.text.x = element_text(size = 12),
       plot.title = element_text(size = 16, face = "bold"),
-      legend.position = "bottom",
+      legend.position = "right",
       legend.title = element_blank(),
       panel.grid.major.x = element_blank(),
       panel.grid.minor.x = element_blank(),

@@ -55,7 +55,7 @@ ggplot(combined_inference_ate_long, aes(x = variable, y = value, fill = Method))
   ylim(-0.2, 1.5) +
   scale_fill_manual(
     values = c("RT" = "#A3C1AD", "SSRT" = "gold", "ART" = "#8C1515"),
-    labels = c("RT" = "RT", "SSRT" = "RRT", "ART" = "ART")
+    labels = c("RT" = "RT", "SSRT" = "RT (RandomSplit)", "ART" = "RT (AdaSplit)")
   ) +
   labs(
     x = NULL,
@@ -67,6 +67,7 @@ ggplot(combined_inference_ate_long, aes(x = variable, y = value, fill = Method))
     axis.text.x = element_text(size = 12),
     plot.title = element_text(size = 16, face = "bold"),
     legend.position = "bottom", 
+    legend.text = element_text(size = 8),
     legend.title = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
