@@ -9,11 +9,13 @@ n = 500 # sample size: 500, 1000
 num_features = 5
 Group.number = 5 # total number of groups
 delta = 1 # effect size; 1, 0
+
 sigma = 1 # std of noise: 1, sqrt(2)
 M = 1000 # number of permutations
 proportion = 0.5 # proportion of randomness in the nuisance fold
 test.stats.method ="AIPW" # test statistics
-n_trial = 3 # number of runs; 20; 100
+
+n_trial = 100 # number of runs; 20; 100
 verbose = F # if true, print out intermediate results
 q = 0.2 # FWER level
 marginalize = T # if marginalize
@@ -31,8 +33,9 @@ settings = c("default",
              "fewer for inference",
              "null more repeats",
              "no marginalization larger sample size",
-             "no marginalization larger noise")
-setting = settings[1]
+             "no marginalization larger noise",
+             "smaller sample size")
+setting = settings[14]
 if(setting == "larger sample size"){n = 1000}
 if(setting == "larger noise"){sigma = sqrt(2)}
 if(setting == "even larger noise"){sigma = 2}
@@ -42,10 +45,10 @@ if(setting == "no marginalization"){marginalize = F}
 if(setting == "mu xgboost"){mu.learner = "xgboost"}
 if(setting == "fewer for nuisance"){proportion = 0.25}
 if(setting == "fewer for inference"){proportion = 0.75}
-if(setting == "null more repeats"){delta = 0; n = 2000; n_trial = 500}
+if(setting == "null more repeats"){delta = 0; n = 2000; n_trial = 1000}
 if(setting == "no marginalization larger sample size"){n = 1000; marginalize = F}
 if(setting == "no marginalization larger noise"){sigma = sqrt(2); marginalize = F}
-
+if(setting == "smaller sample size"){n = 300}
 
 set.seed(318)
 
@@ -54,23 +57,22 @@ set.seed(318)
 pval = list()
 pval$ART <- matrix(0, nrow = n_trial, ncol = Group.number)
 colnames(pval$ART) <- paste0("p", seq(1, Group.number))
-pval$SSRT = pval$RT = pval$ART
+pval$SSSSRT = pval$SSRT = pval$RT = pval$ART
 
 # FWER
-FWER = list(); FWER$ART = FWER$SSRT = FWER$RT = c()
+FWER = list(); FWER$ART = FWER$SSRT = FWER$SSSSRT = FWER$RT = c()
 
 # Number of subgroup rejections
-R = list(); R$ART = R$SSRT = R$RT = c()
+R = list(); R$ART = R$SSRT = R$SSSSRT = R$RT = c()
 
 # Quality of nuisance estimator
-R2 = list(); R2$ART = R2$SSRT = c()
+R2 = list(); R2$ART = R2$SSRT = R2$SSSSRT = c()
 
 # Proportion of inference fold
-inference.proportion = list(); inference.proportion$ART = inference.proportion$SSRT = matrix(0, nrow = n_trial, ncol = Group.number)
-inference.proportion.before.throw.away = inference.proportion
+inference.proportion = list(); inference.proportion$ART = inference.proportion$SSRT = inference.proportion$SSSSRT = matrix(0, nrow = n_trial, ncol = Group.number)
 
 # Average treatment effect in the inference fold
-inference.ATE = list(); inference.ATE$ART = inference.ATE$SSRT = matrix(0, nrow = n_trial, ncol = Group.number)
+inference.ATE = list(); inference.ATE$ART = inference.ATE$SSRT = inference.ATE$SSSSRT = matrix(0, nrow = n_trial, ncol = Group.number)
 
 # Data for evaluating the nuisance estimation performance
 n.val = 10^4
@@ -101,9 +103,9 @@ for (j in 1:n_trial){
   Group = S - 1
   G = model.matrix(~ factor(Group))[, -1]
   Ex = rep(0.5,n)
-  X[,4] = (X[,4]>0.75)
+  X[,2] = (X[,2]>0.75)
   mu = X %*%rnorm(num_features, 1, 1)
-  X[,5] = (X[,5]>0.25); tau = (X - 0.5) %*% rep(delta, num_features) + 0.5 * delta
+  X[,3] = (X[,3]>0.25); tau = (X - 0.5) %*% rep(delta, num_features) + 0.5 * delta
     
   mu0 <- mu - Ex * tau
   mu1 <- mu0 + tau
@@ -143,7 +145,7 @@ for (j in 1:n_trial){
   R2$SSRT = c(R2$SSRT, 1-v)  
   if(verbose){cat("R^2 of SSRT:", 1 - v, "\n")}
   
-  # Randomization tests
+  # Randomization test
   test.stats.value.ss = test.stats.group(Y = Y[test.index.ss], W = W[test.index.ss], Group = Group[test.index.ss], stats = test.stats.method, Ex = Ex[test.index.ss], 
                                       mu0.hat = tau.hat.ss$mu0[test.index.ss], mu1.hat = tau.hat.ss$mu1[test.index.ss], mu.hat = mu.hat[test.index.ss], tau.hat = tau.hat.ss$tau[test.index.ss])
   
@@ -152,11 +154,29 @@ for (j in 1:n_trial){
                                                    tau.hat = tau.hat.ss$tau[test.index.ss], test.index = test.index.ss))) 
   
   pval$SSRT[j,] = sapply(seq(1, length(test.stats.value.ss)), function(x) { sum(test.stats.ref.ss[, x]>=test.stats.value.ss[x])/(M+1) + 1/(M+1)})
-  
+
   # FWER
   adjusted_p_values.ssrt <- p.adjust(pval$SSRT[j,], method = "holm")
   FWER$ssrt[j] = 1 - min(1, H[adjusted_p_values.ssrt <= q])
   R$ssrt[j] = sum((adjusted_p_values.ssrt <= q))
+  
+  # Randomization test with subgroup selection
+  test.index.ss.ss = intersect(test.index.ss, which(tau.hat.ss$tau >= 0)) 
+  test.stats.value.ss.ss = test.stats.group(Y = Y[test.index.ss.ss], W = W[test.index.ss.ss], Group = Group[test.index.ss.ss], stats = test.stats.method, Ex = Ex[test.index.ss.ss], 
+                                         mu0.hat = tau.hat.ss$mu0[test.index.ss.ss], mu1.hat = tau.hat.ss$mu1[test.index.ss.ss], mu.hat = mu.hat[test.index.ss.ss], tau.hat = tau.hat.ss$tau[test.index.ss.ss])
+  
+  test.stats.ref.ss.ss = t(replicate(M, test.stats.group(Y = Y[test.index.ss.ss], W = W[test.index.ss.ss], Group = Group[test.index.ss.ss], stats = test.stats.method, Ex = Ex[test.index.ss.ss], 
+                                                      mu0.hat = tau.hat.ss$mu0[test.index.ss.ss], mu1.hat = tau.hat.ss$mu1[test.index.ss.ss], mu.hat = mu.hat[test.index.ss.ss], 
+                                                      tau.hat = tau.hat.ss$tau[test.index.ss.ss], test.index = test.index.ss.ss))) 
+  
+  pval$SSSSRT[j, ] = 1
+  pval$SSSSRT[j, 1 + sort(unique(Group[test.index.ss.ss]))] = sapply(seq(1, length(test.stats.value.ss.ss)), function(x) { sum(test.stats.ref.ss.ss[, x]>=test.stats.value.ss.ss[x])/(M+1) + 1/(M+1)}) # If a subgroup has no units left for inference, we set the associated p-value to one.
+  
+  
+  # FWER
+  adjusted_p_values.ssssrt <- p.adjust(pval$SSSSRT[j,], method = "holm")
+  FWER$ssssrt[j] = 1 - min(1, H[adjusted_p_values.ssssrt <= q])
+  R$ssssrt[j] = sum((adjusted_p_values.ssssrt <= q))
   
   
   # Randomization test with adaptive splitting
@@ -164,8 +184,7 @@ for (j in 1:n_trial){
   tau.hat.adaptive = nuisance.tau.active(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, Group = Group, proportion = proportion, marginalize = marginalize) # estimate tau using active learning
   train.index.adaptive = tau.hat.adaptive$train.index # the data points fitted to the nuisance
   test.index.adaptive = setdiff(1:n,train.index.adaptive) # the data points used for inference
-  inference.proportion$ART[j,] = table(Group[setdiff(1:n,tau.hat.adaptive$train.index)])
-  inference.proportion.before.throw.away$ART[j,] = table(Group[setdiff(1:n,tau.hat.adaptive$train.index.before.throw.away)])
+  inference.proportion$ART[j,] = table(Group[test.index.adaptive])
   inference.ATE$ART[j,] = aggregate(tau[test.index.adaptive], by = list(Group[test.index.adaptive]), mean)$x
   
   v = sum((tau.val - cbind(1,X.val) %*% tau.hat.adaptive$beta)**2)/sum((tau.val - mean(tau.val))**2)
@@ -203,29 +222,32 @@ for (j in 1:n_trial){
 
 p_values_df_rt <- as.data.frame(pval$RT)
 p_values_df_ssrt <- as.data.frame(pval$SSRT)
+p_values_df_ssssrt <- as.data.frame(pval$SSSSRT)
 p_values_df_art <- as.data.frame(pval$ART)
 
 colnames(p_values_df_rt) <- paste("Group", 1:Group.number)
 colnames(p_values_df_ssrt) <- paste("Group", 1:Group.number)
+colnames(p_values_df_ssssrt) <- paste("Group", 1:Group.number)
 colnames(p_values_df_art) <- paste("Group", 1:Group.number)
 
 p_values_df_rt$Method <- "RT"
 p_values_df_art$Method <- "ART"
 p_values_df_ssrt$Method <- "SSRT"
+p_values_df_ssssrt$Method <- "SSSSRT"
 
-combined_p_values_df <- rbind(p_values_df_rt, p_values_df_ssrt, p_values_df_art)
+combined_p_values_df <- rbind(p_values_df_rt, p_values_df_ssrt, p_values_df_ssssrt, p_values_df_art)
 
 combined_p_values_long <- reshape2::melt(combined_p_values_df, id.vars = "Method")
 combined_p_values_long$Method <- factor(
   combined_p_values_long$Method,
-  levels = c("RT", "SSRT", "ART") 
+  levels = c("RT", "SSRT", "SSSSRT", "ART") 
 )
 
 par(mar = c(5, 5, 4, 5))
-group_spacing <- 4 
-at_positions <- rep(1:Group.number, each = 3) * group_spacing + c(-1, 0, 1)
+group_spacing <- 5
+at_positions <- rep(1:Group.number, each = 4) * group_spacing + c(-1, 0, 1, 2) # each = number of methods
 
-cols = c("#A3C1AD", "gold", "#8C1515")
+cols = c("#A3C1AD", "gold", "coral",  "#8C1515")
 boxplot(value ~ Method + variable, data = combined_p_values_long, 
         at = at_positions, col = cols, notch = F, xaxt = "n",
         ylab = "P-values", xlab = "", # Remove the x-axis label
@@ -237,7 +259,7 @@ boxplot(value ~ Method + variable, data = combined_p_values_long,
 axis(1, at = 1:Group.number * group_spacing, labels = paste("Group", 1:Group.number),
      cex.axis = 1.5)  
 
-legend("topright", legend = c("RT", "SSRT", "ART"), fill = cols, 
+legend("topright", legend = c("RT", "SSRT", "SSSSRT", "ART"), fill = cols, 
        cex = 0.8, 
        pt.cex = 2,  
        bg = "white",
@@ -256,13 +278,19 @@ data.frame("Nuisance estimation R2" = lapply(R2, mean),
 
 data.frame("RT" = round(colMeans(pval$RT[1:j,]),2),
            "SSRT" = round(colMeans(pval$SSRT[1:j,]),2),
+           "SSSSRT" = round(colMeans(pval$SSSSRT[1:j,]),2),
            "ART" = round(colMeans(pval$ART[1:j,]),2))
 
 
 # save data
 record = list()
 record$pval = pval; record$R = R; record$R2 = R2; record$FWER = FWER
-record$inference.ATE = inference.ATE; record$inference.proportion = lapply(inference.proportion, function(x){x / (n / Group.number)}); record$inference.proportion.before.throw.away = lapply(inference.proportion.before.throw.away, function(x){x / (n / Group.number)})
+record$inference.ATE = inference.ATE; record$inference.proportion = lapply(inference.proportion, function(x){x / (n / Group.number)})
 # saveRDS(record, file = paste(file.path(directory, setting), ".rds", sep = ""))
+
+
+
+
+
 
 
