@@ -239,7 +239,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
     # Use 5-fold cross-validation to choose lambda (start)
     if(epoch %% lambda.update.period == 0){
-      lambda.candidate = 2^(seq(-4, 0))
+      lambda.candidate = 10^(seq(-4, 0))
       shuffled = sample(train.index)
       folds = split(shuffled, cut(seq_along(shuffled), breaks = 5, labels = FALSE)) # Split the training data randomly into 5 equal folds
       cv.loss = matrix(0, 5, length(lambda.candidate))

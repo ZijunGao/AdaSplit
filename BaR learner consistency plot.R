@@ -61,7 +61,7 @@ data_long <- data %>%
   pivot_longer(cols = everything(), names_to = "sample_size", values_to = "betaError") %>%
   mutate(sample_size = as.integer(sub("n", "", sample_size)))
 
-# Compute mean and sd of R²
+# Compute mean and sd of R2
 summary_df <- data_long %>%
   group_by(sample_size) %>%
   summarise(
