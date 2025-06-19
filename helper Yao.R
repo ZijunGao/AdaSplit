@@ -23,7 +23,7 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   tau = cbind(1, X) %*% beta
   
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, marginalize = marginalize)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, marginalize = marginalize, lambda = lambda)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   mu0.hat <- mu - Ex * tau.imputed
@@ -33,7 +33,7 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
 }
 
 
-Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FALSE, marginalize = T){
+Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FALSE, marginalize = T, lambda = 1){
 
   n = length(W)
   k = sum(A[1,]) 
@@ -51,6 +51,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
   }else{
     IW = rep(1,n)
   }
+  IW[test.index] = lambda * IW[test.index] 
 
 
   XX <- cbind(1, rbind(X,X))
@@ -68,7 +69,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
 }
 
 
-nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01, robust = F, marginalize = T, ...){
+nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01, robust = F, marginalize = T, lambda = 1, lambda.update.period = Inf, loss_threshold = NULL, ...){
   
   # Y is an n-dimensional outcome matrix
   # X is an n x d covariate matrix 
@@ -80,6 +81,11 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   # groupwise indicate if we will select points evenly across the groups
   # k is the number of nearest neighbors used in the knn model for correcting selection bias
   # p is the threshold for clipping the inverse probability weights
+  # lambda balances the contributions to the loss from units with observed treatment assignments, denoted by loss(observed), and those with imputed treatment assignments, denoted by loss(imputed). Explicitly, loss = loss(observed) + lambda * loss(imputed). Default value is one.
+  # lambda.update.period specifies the number of epochs between updates of lambda. The default is Inf, meaning that lambda is not updated.
+  # loss_threshold is the cutoff below which the algorithm is allowed to stop. If the max_loss falls below this value, the iteration terminates.
+
+
   
   # Compute the sample size
   n = length(Y) 
@@ -128,7 +134,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   # Compute Imputed OLS
   Q = Posterior(train.index, tau, X, R, W, Ex)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   # Set the stopping rule
@@ -137,11 +143,13 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   if(robust){
     window_size <- 10
     epoch.gap = 20
-    loss_threshold <- 0.1
+    if(is.null(loss_threshold)){loss_threshold <- 0.1}
+    lambda.update = 20
   }else{
     window_size <- 50
     epoch.gap = 1
-    loss_threshold <- 0.01
+    if(is.null(loss_threshold)){loss_threshold <- 0.01}
+    lambda.update = 20
   }
   
   
@@ -149,7 +157,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   epoch <- 0
   stop = FALSE
   Group.idx = sort(unique(Group))
-  
+  lambda.seq = lambda
 
   
   while ( length(train.index) < ceiling(proportion * n) ) {
@@ -207,7 +215,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
       
       Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
-      beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
+      beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
       tau.imputed = cbind(1, X) %*% beta.imputed
   
       # Compute the estimator change due to the new data point
@@ -229,7 +237,31 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
     if (stop){break} 
     
+    # Use 5-fold cross-validation to choose lambda (start)
+    if(epoch %% lambda.update.period == 0){
+      lambda.candidate = 2^(seq(-4, 0))
+      shuffled = sample(train.index)
+      folds = split(shuffled, cut(seq_along(shuffled), breaks = 5, labels = FALSE)) # Split the training data randomly into 5 equal folds
+      cv.loss = matrix(0, 5, length(lambda.candidate))
+      for(fold.index in 1 : 5){
+        validation.index = folds[[fold.index]]
+        for(lambda.index in seq(1, length(lambda.candidate))){
+          new.train.index = sapply(setdiff(train.index, validation.index), function(x){x - sum(validation.index < x)})
+          beta.temp = Posterior_fit(new.train.index, X[-validation.index,,drop = F], R[-validation.index], W[-validation.index], Ex[-validation.index], Q[-validation.index], A[-validation.index,,drop = F], marginalize = marginalize, lambda = lambda.candidate[lambda.index])
+          cv.loss[fold.index, lambda.index] = sum((R[validation.index] - (W - Ex)[validation.index] * (cbind(1, X[validation.index,,drop = F]) %*% beta.temp))^2)
+        }        
+      }
+      cv.loss.average = apply(cv.loss, 2, mean)
+      cv.loss.se = apply(cv.loss, 2, sd) / sqrt(5) 
+      # print(data.frame(loss = cv.loss.average, lse = cv.loss.average + cv.loss.se)) # To be deleted
+      # print(cv.loss.average * 5 / length(train.index)) # To be deleted
+      lambda = max(lambda.candidate[cv.loss.average < (cv.loss.average + cv.loss.se)[which.min(cv.loss.average)]])
+      lambda.seq = c(lambda.seq, lambda)
+    }
+    # Use 5-fold cross-validation to choose lambda (end)
+    
   }
+  
   
   if(!robust){
     
@@ -243,7 +275,6 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
 
     test.index.move = NULL
-    
     for (g in Group.0){
       size.g = sum(Group==g)
       idx.g = which(Group[test.index]==g)
@@ -257,13 +288,12 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     train.index = c(train.index, test.index.move)
     test.index = setdiff(1:n, train.index)
     Q = Posterior(train.index, tau.imputed, X, R, W, Ex)
-    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize)
+    beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
     tau.imputed = cbind(1, X) %*% beta.imputed
   }
-  
   cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
   
-  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index, beta = beta.imputed, train.index.before.throw.away = train.index.before.throw.away)) 
+  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index, beta = beta.imputed, train.index.before.throw.away = train.index.before.throw.away, lambda.seq = lambda.seq)) 
 }
 
 
