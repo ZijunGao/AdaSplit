@@ -7,7 +7,7 @@ library(pracma)
 library(Matrix)
 
 
-nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, train.index = NULL, k=20, marginalize = T, ...){
+nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, train.index = NULL, k=20, marginalize = T, lambda = 1, ...){
   
   # initial fit
   n = length(Y)
@@ -69,7 +69,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.01, weighting=FAL
 }
 
 
-nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01, robust = F, marginalize = T, lambda = 1, lambda.update.period = Inf, loss_threshold = NULL, ...){
+nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.01, robust = F, marginalize = T, lambda = 1, lambda.update.period = Inf, loss_threshold = NULL, initial.proportion = 0.05, ...){
   
   # Y is an n-dimensional outcome matrix
   # X is an n x d covariate matrix 
@@ -99,8 +99,8 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   R = Y - mu
   
   # Initialization
-  n_0 = min(dim(X)[2]+5, round(0.05*n))
-  train.index = select.train(Group, n_0/n) 
+  n_0 = max(dim(X)[2]+5, round(initial.proportion*n)) # min(dim(X)[2]+5, round(initial.proportion*n))
+  train.index = select.train(Group, n_0/n, random = F, X) # Select units in decreasing order of X_j^\top (X_{[n]}^{T}X_{[n]})^{-2}X_j
   test.index = setdiff(1:n,train.index) 
   n.train = length(train.index)
   n.test = length(test.index)
@@ -172,7 +172,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     power = numeric(n)
     
 
-    power = abs(Ex - Q)*sign(tau.imputed)
+    power = abs(Ex - Q) *sign(tau.imputed)
     power = power[test.index]
 
     if(robust){power = (TE^2)[test.index]}
@@ -197,9 +197,14 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       idx = which(Group[test.index] %in% Group.0)
     }
     
+    if(epoch %% 2 == 0){
+      # new = sample(test.index[idx], 1)
+      new = intersect(order(diag(X %*% solve(t(X) %*% X) %*% solve(t(X) %*% X) %*% t(X)), decreasing = T), test.index[idx])[1]
 
-    new = test.index[idx][which.min(power[idx])]
-    
+    }else{
+      new = test.index[idx][which.min(power[idx])] # Add a new data point to the nuisance estimation fold
+    }
+
     # Update the indices of the nuisance and inference folds
     train.index = c(train.index, new)
     test.index = setdiff(1:n,train.index)
@@ -239,7 +244,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
     # Use 5-fold cross-validation to choose lambda (start)
     if(epoch %% lambda.update.period == 0){
-      lambda.candidate = 10^(seq(-4, 0))
+      lambda.candidate = 5^(seq(-4, 0))
       shuffled = sample(train.index)
       folds = split(shuffled, cut(seq_along(shuffled), breaks = 5, labels = FALSE)) # Split the training data randomly into 5 equal folds
       cv.loss = matrix(0, 5, length(lambda.candidate))
@@ -247,6 +252,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
         validation.index = folds[[fold.index]]
         for(lambda.index in seq(1, length(lambda.candidate))){
           new.train.index = sapply(setdiff(train.index, validation.index), function(x){x - sum(validation.index < x)})
+          # print(train.index); print(validation.index); print(new.train.index)
           beta.temp = Posterior_fit(new.train.index, X[-validation.index,,drop = F], R[-validation.index], W[-validation.index], Ex[-validation.index], Q[-validation.index], A[-validation.index,,drop = F], marginalize = marginalize, lambda = lambda.candidate[lambda.index])
           cv.loss[fold.index, lambda.index] = sum((R[validation.index] - (W - Ex)[validation.index] * (cbind(1, X[validation.index,,drop = F]) %*% beta.temp))^2)
         }        
@@ -556,7 +562,7 @@ prop.group <- function(Group, Group.idx,test.index){
 }
 
 
-select.train <- function(Group, prop) {
+select.train <- function(Group, prop, random = T, ...) {
 
   unique_groups <- unique(Group)
   
@@ -570,8 +576,13 @@ select.train <- function(Group, prop) {
     # How many to pick in group g
     n.pick <- round(length(idx.g) * prop)
     
-    # Randomly sample those indices
-    chosen <- sample(idx.g, n.pick)
+    if(random){
+      # Randomly sample those indices
+      chosen <- sample(idx.g, n.pick)
+    }else{
+      # Select in decreasing order of X_j^\top (X_{[n]}^{T}X_{[n]})^{-2}X_j
+      chosen <- intersect(order(diag(X %*% solve(t(X) %*% X) %*% solve(t(X) %*% X) %*% t(X)), decreasing = T), idx.g)[seq(1, n.pick)]
+    }
     
     # Combine into the overall result
     training.indices <- c(training.indices, chosen)
