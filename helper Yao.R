@@ -24,7 +24,7 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   tau = cbind(1, X) %*% beta
   
   Q = Posterior(train.index, tau, X, R, W, Ex,IW)
-  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, weighting=FALSE, marginalize = marginalize, lambda = lambda)
+  beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
   mu0.hat <- mu - Ex * tau.imputed
@@ -34,37 +34,21 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
 }
 
 
-Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.05, weighting=FALSE, marginalize = T, lambda = 1){
+Posterior_fit = function(train.index, X, R, W, Ex, Q, A, marginalize = T, lambda = 1){
 
   n = length(W)
   k = sum(A[1,]) 
   n.train = length(train.index)
   test.index = setdiff(1:n,train.index)
-
-  #if (weighting){
-  #  v = rep(0,n)
-  #  v[test.index] = 1.0
-  #  p.test = (A %*% v)/k
-  #  p.train = 1 - p.test
-    #p.train.marginal = n.train/n
-  #  #p.test.marginal = 1 - p.train.marginal
-  #  IW = 1 / pmax(p.train,p)
-    #p.test/pmax(p.train,p)*p.train.marginal/p.test.marginal
-  #}else{
-  #  IW = rep(1,n)
-  #}
-  #
-  IW = rep(1,n)
-  #IW[test.index] = lambda * IW[test.index] 
-
-
+  
+  
   XX <- cbind(1, rbind(X,X))
   W1 = W1_ = Ex**2 ; W2 = W2_ =  (1 - Ex)**2
-  W1_[train.index] = W[train.index] * W1[train.index] * IW[train.index]
-  W1_[test.index] =  W1[test.index]*Q[test.index]* IW[test.index] * marginalize
+  W1_[train.index] = W[train.index] * W1[train.index] 
+  W1_[test.index] =  W1[test.index]*Q[test.index] * marginalize
 
-  W2_[train.index] = (1-W[train.index]) * W2[train.index] * IW[train.index]
-  W2_[test.index] = W2[test.index]*(1-Q[test.index])* IW[test.index] * marginalize
+  W2_[train.index] = (1-W[train.index]) * W2[train.index]
+  W2_[test.index] = W2[test.index]*(1-Q[test.index]) * marginalize
 
   inv_XTWX = solve(t(XX) %*% diag(c(W1_,W2_)) %*% XX + 10e-10*diag(rep(1.0,dim(XX)[2])))
   beta = inv_XTWX %*% t(XX) %*% diag(c(W1_,W2_)) %*% c( R/(1 - Ex),  R/(0 - Ex))
@@ -73,7 +57,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, p = 0.05, weighting=FAL
 }
 
 
-nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = FALSE, k= 20, p=0.05, robust = F, marginalize = T, lambda = 1, lambda.update.period = Inf, loss_threshold = NULL, initial.proportion = 0.05, ...){
+nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = TRUE, k= 20, p=0.05, robust = F, marginalize = T, lambda = 1, lambda.update.period = Inf, loss_threshold = NULL, initial.proportion = 0.05, ...){
   
   # Y is an n-dimensional outcome matrix
   # X is an n x d covariate matrix 
@@ -110,17 +94,15 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   n.test = length(test.index)
   prop.group.test = prop.group(Group,test.index)
   
-  #if (weighting){
-  v = rep(0,n)
-  v[test.index] = 1.0
-  p.test = (A %*% v)/k
-  p.train = 1 - p.test
-  #p.train.marginal = n.train/n
-  #p.test.marginal = 1 - p.train.marginal
-  IW =  1 / pmax(p.train,p) # p.test/pmax(p.train,p)*p.train.marginal/p.test.marginal
-  #}else{
-  #  IW = rep(1,n)
-  #}
+  if (weighting){
+    v = rep(0,n)
+    v[test.index] = 1.0
+    p.test = (A %*% v)/k
+    p.train = 1 - p.test
+    IW =  1 / pmax(p.train,p)
+  }else{
+    IW = rep(1,n)
+  }
 
   # Compute OLS
   X_ = cbind(1, X[train.index,])
@@ -619,7 +601,45 @@ select.train <- function(Group, prop, random = T, ...) {
 
 
 
-normalize <- function(x, min_val = 0, max_val = 1) {
-  rng <- range(x, na.rm = TRUE)
-  (x - rng[1]) / (rng[2] - rng[1]) * (max_val - min_val) + min_val
+
+
+closing <- function(p_val, q = 0.05, global.null.test = c("Fisher", "Bonferroni", "Simes")) {
+  global.null.test <- match.arg(global.null.test)
+  
+  K <- length(p_val)
+  subsets <- unlist(lapply(1:K, function(k) combn(K, k, simplify = FALSE)), recursive = FALSE)
+  
+  # Compute global p-values for each subset using the specified combining method
+  global_p <- sapply(subsets, function(S) {
+    S_pvals <- p_val[S]
+    k <- length(S)
+    
+    if (global.null.test == "Fisher") {
+      stat <- -2 * sum(log(S_pvals))
+      pchisq(stat, df = 2 * k, lower.tail = FALSE)
+      
+    } else if (global.null.test == "Bonferroni") {
+      min_p <- min(S_pvals)
+      min(1, k * min_p)
+      
+    } else if (global.null.test == "Simes") {
+      sorted_p <- sort(S_pvals)
+      simes_p <- min(sorted_p * k / seq_len(k))
+      min(1, simes_p)
+    }
+  })
+  
+  # For each hypothesis j, find max global p over all subsets that include j
+  adjusted_p <- rep(NA, K)
+  for (j in 1:K) {
+    relevant_indices <- which(sapply(subsets, function(S) j %in% S))
+    adjusted_p[j] <- max(global_p[relevant_indices])
+  }
+  
+  rejected <- adjusted_p <= q
+  return(rejected)
 }
+
+
+
+
