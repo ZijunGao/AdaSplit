@@ -3,7 +3,7 @@ rm(list = ls())
 source("~/Desktop/Research/Yao/HTE inference/code/Panning/helper Yao.R")
 # source("/Users/yaozhang/Documents/GitHub/Panning/helper Yao.R")
 
-directory = "~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025" 
+directory = "~/Desktop/Research/Yao/HTE inference/code/Panning/July 2025"
   
 n = 500 # sample size: 500, 1000
 num_features = 5
@@ -15,12 +15,11 @@ M = 1000 # number of permutations
 proportion = 0.5 # proportion of randomness in the nuisance fold
 test.stats.method ="AIPW" # test statistics
 
-n_trial = 100 # number of runs; 20; 100
+n_trial = 100 # number of runs; 20; 100                                                              
 verbose = F # if true, print out intermediate results
 q = 0.2 # FWER level
 marginalize = T # if marginalize
 mu.learner = "linear"
-
 settings = c("default",
              "larger sample size",
              "larger noise",
@@ -35,7 +34,7 @@ settings = c("default",
              "no marginalization larger sample size",
              "no marginalization larger noise",
              "smaller sample size")
-setting = settings[14]
+setting = "no marginalization larger noise" # "default", "larger sample size", "larger noise", "null more repeats"
 if(setting == "larger sample size"){n = 1000}
 if(setting == "larger noise"){sigma = sqrt(2)}
 if(setting == "even larger noise"){sigma = 2}
@@ -45,7 +44,7 @@ if(setting == "no marginalization"){marginalize = F}
 if(setting == "mu xgboost"){mu.learner = "xgboost"}
 if(setting == "fewer for nuisance"){proportion = 0.25}
 if(setting == "fewer for inference"){proportion = 0.75}
-if(setting == "null more repeats"){delta = 0; n = 2000; n_trial = 1000}
+if(setting == "null more repeats"){delta = 0; n = 2000; n_trial = 200}
 if(setting == "no marginalization larger sample size"){n = 1000; marginalize = F}
 if(setting == "no marginalization larger noise"){sigma = sqrt(2); marginalize = F}
 if(setting == "smaller sample size"){n = 300}
@@ -57,22 +56,22 @@ set.seed(318)
 pval = list()
 pval$ART <- matrix(0, nrow = n_trial, ncol = Group.number)
 colnames(pval$ART) <- paste0("p", seq(1, Group.number))
-pval$SSSSRT = pval$SSRT = pval$RT = pval$ART
+pval$ART.no.weighting = pval$SSSSRT = pval$SSRT = pval$RT = pval$ART
 
 # FWER
-FWER = list(); FWER$ART = FWER$SSRT = FWER$SSSSRT = FWER$RT = c()
+FWER = list(); FWER$ART = FWER$ART.no.weighting = FWER$SSRT = FWER$SSSSRT = FWER$RT = c()
 
 # Number of subgroup rejections
-R = list(); R$ART = R$SSRT = R$SSSSRT = R$RT = c()
+R = list(); R$ART = R$ART.no.weighting = R$SSRT = R$SSSSRT = R$RT = c()
 
 # Quality of nuisance estimator
-R2 = list(); R2$ART = R2$SSRT = R2$SSSSRT = c()
+R2 = list(); R2$ART = R2$ART.no.weighting = R2$SSRT = R2$SSSSRT = c()
 
 # Proportion of inference fold
-inference.proportion = list(); inference.proportion$ART = inference.proportion$SSRT = inference.proportion$SSSSRT = matrix(0, nrow = n_trial, ncol = Group.number)
+inference.proportion = list(); inference.proportion$ART.no.weighting = inference.proportion$ART = inference.proportion$SSRT = inference.proportion$SSSSRT = matrix(0, nrow = n_trial, ncol = Group.number)
 
 # Average treatment effect in the inference fold
-inference.ATE = list(); inference.ATE$ART = inference.ATE$SSRT = inference.ATE$SSSSRT = matrix(0, nrow = n_trial, ncol = Group.number)
+inference.ATE = list(); inference.ATE$ART.no.weighting = inference.ATE$ART = inference.ATE$SSRT = inference.ATE$SSSSRT = matrix(0, nrow = n_trial, ncol = Group.number)
 
 # Data for evaluating the nuisance estimation performance
 n.val = 10^4
@@ -127,11 +126,9 @@ for (j in 1:n_trial){
   pval$RT[j,] = sapply(seq(1, length(test.stats.value.rt)), function(x) { sum(test.stats.ref.rt[, x]>=test.stats.value.rt[x])/(M+1) + 1/(M+1)})
   
   # FWER
-  adjusted_p_values.rt <- p.adjust(pval$RT[j,], method = "holm")
-  R$rt[j] = sum((adjusted_p_values.rt <= q))
-  FWER$rt[j] = 1 - min(1, H[adjusted_p_values.rt <= q])
-  
-  
+  R$rt[j] = sum(closing(p_val = pval$RT[j,], q = q, global.null.test = "Fisher"))
+  FWER$rt[j] = 1 - min(1, H[rank(pval$RT[j,]) <= R$rt[j]])
+   
   # Randomization test with sample splitting
   train.index.ss = select.train(Group, proportion)
   test.index.ss = setdiff(1:n, train.index.ss)
@@ -156,9 +153,9 @@ for (j in 1:n_trial){
   pval$SSRT[j,] = sapply(seq(1, length(test.stats.value.ss)), function(x) { sum(test.stats.ref.ss[, x]>=test.stats.value.ss[x])/(M+1) + 1/(M+1)})
 
   # FWER
-  adjusted_p_values.ssrt <- p.adjust(pval$SSRT[j,], method = "holm")
-  FWER$ssrt[j] = 1 - min(1, H[adjusted_p_values.ssrt <= q])
-  R$ssrt[j] = sum((adjusted_p_values.ssrt <= q))
+  R$ssrt[j] = sum(closing(p_val = pval$SSRT[j,], q = q, global.null.test = "Fisher"))
+  FWER$ssrt[j] = 1 - min(1, H[rank(pval$SSRT[j,]) <= R$ssrt[j]])
+  
   
   # Randomization test with subgroup selection
   test.index.ss.ss = intersect(test.index.ss, which(tau.hat.ss$tau >= 0)) 
@@ -174,11 +171,9 @@ for (j in 1:n_trial){
   
   
   # FWER
-  adjusted_p_values.ssssrt <- p.adjust(pval$SSSSRT[j,], method = "holm")
-  FWER$ssssrt[j] = 1 - min(1, H[adjusted_p_values.ssssrt <= q])
-  R$ssssrt[j] = sum((adjusted_p_values.ssssrt <= q))
-  
-  
+  R$ssssrt[j] = sum(closing(p_val = pval$SSSSRT[j,], q = q, global.null.test = "Fisher"))
+  FWER$ssssrt[j] = 1 - min(1, H[rank(pval$SSSSRT[j,]) <= R$ssssrt[j]])
+
   # Randomization test with adaptive splitting
   # Nuisance function estimation
   tau.hat.adaptive = nuisance.tau.active(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, Group = Group, proportion = proportion, marginalize = marginalize) # estimate tau using active learning
@@ -201,17 +196,45 @@ for (j in 1:n_trial){
                                                           tau.hat = tau.hat.adaptive$tau[test.index.adaptive], test.index=test.index.adaptive[test.index.adaptive])))
 
   pval$ART[j,] = sapply(seq(1, length(test.stats.value.adaptive)), function(x) { sum(test.stats.ref.adaptive[, x]>=test.stats.value.adaptive[x])/(M+1) + 1/(M+1)})
+  # FWER
+  R$art[j] = sum(closing(p_val = pval$ART[j,], q = q, global.null.test = "Fisher"))
+  FWER$art[j] = 1 - min(1, H[rank(pval$ART[j,]) <= R$art[j]])
+  
+  
+  # AdaSplit without weighting
+  # Randomization test with adaptive splitting
+  # Nuisance function estimation
+  tau.hat.adaptive = nuisance.tau.active(Y = Y, X = X, Ex = Ex, W = W, mu = mu.hat, Group = Group, proportion = proportion, marginalize = marginalize, weighting = F) # estimate tau using active learning
+  train.index.adaptive = tau.hat.adaptive$train.index # the data points fitted to the nuisance
+  test.index.adaptive = setdiff(1:n,train.index.adaptive) # the data points used for inference
+  inference.proportion$ART.no.weighting[j,] = table(Group[test.index.adaptive])
+  inference.ATE$ART.no.weighting[j,] = aggregate(tau[test.index.adaptive], by = list(Group[test.index.adaptive]), mean)$x
+  
+  v = sum((tau.val - cbind(1,X.val) %*% tau.hat.adaptive$beta)**2)/sum((tau.val - mean(tau.val))**2)
+  R2$ART.no.weighting = c(R2$ART.no.weighting, 1-v)
+  if(verbose){cat("R^2 of ART.no.weighting:", 1- v, "\n")}
+  
+  # Randomization tests
+  test.stats.value.adaptive = test.stats.group(Y = Y[test.index.adaptive], W = W[test.index.adaptive], Group = Group[test.index.adaptive], stats = test.stats.method, Ex = Ex[test.index.adaptive], 
+                                               mu0.hat = tau.hat.adaptive$mu0[test.index.adaptive], mu1.hat = tau.hat.adaptive$mu1[test.index.adaptive], mu.hat = mu.hat[test.index.adaptive], 
+                                               tau.hat = tau.hat.adaptive$tau[test.index.adaptive])
+  
+  test.stats.ref.adaptive = t(replicate(M, test.stats.group(Y = Y[test.index.adaptive], W =  W[test.index.adaptive], Group = Group[test.index.adaptive], stats = test.stats.method, Ex = Ex[test.index.adaptive], 
+                                                            mu0.hat = tau.hat.adaptive$mu0[test.index.adaptive], mu1.hat = tau.hat.adaptive$mu1[test.index.adaptive], mu.hat = mu.hat[test.index.adaptive], 
+                                                            tau.hat = tau.hat.adaptive$tau[test.index.adaptive], test.index=test.index.adaptive[test.index.adaptive])))
+  
+  pval$ART.no.weighting[j,] = sapply(seq(1, length(test.stats.value.adaptive)), function(x) { sum(test.stats.ref.adaptive[, x]>=test.stats.value.adaptive[x])/(M+1) + 1/(M+1)})
   
   # FWER
-  adjusted_p_values.art <- p.adjust(pval$ART[j,], method = "holm")
-  FWER$art[j] = 1 - min(1, H[adjusted_p_values.art <= q])
-  R$art[j] = sum((as.numeric(adjusted_p_values.art) <= q))
+  R$art.no.weighting[j] = sum(closing(p_val = pval$ART.no.weighting[j,], q = q, global.null.test = "Fisher"))
+  FWER$art.no.weighting[j] = 1 - min(1, H[rank(pval$ART.no.weighting[j,]) <= R$art.no.weighting[j]])
   
   print(j)
   if(verbose){
     cat("RT:",round(pval$RT[j,] ,3), "\n")
     cat("SSRT:",round(pval$SSRT[j,],3), "\n")
     cat("ART:",round(pval$ART[j,] ,3), "\n")
+    cat("ART no weighting:",round(pval$ART.no.weighting[j,] ,3), "\n")
     cat("\n")
   }  
   
@@ -224,30 +247,33 @@ p_values_df_rt <- as.data.frame(pval$RT)
 p_values_df_ssrt <- as.data.frame(pval$SSRT)
 p_values_df_ssssrt <- as.data.frame(pval$SSSSRT)
 p_values_df_art <- as.data.frame(pval$ART)
+p_values_df_art_no_weighting <- as.data.frame(pval$ART.no.weighting)
 
 colnames(p_values_df_rt) <- paste("Group", 1:Group.number)
 colnames(p_values_df_ssrt) <- paste("Group", 1:Group.number)
 colnames(p_values_df_ssssrt) <- paste("Group", 1:Group.number)
 colnames(p_values_df_art) <- paste("Group", 1:Group.number)
+colnames(p_values_df_art_no_weighting) <- paste("Group", 1:Group.number)
 
 p_values_df_rt$Method <- "RT"
 p_values_df_art$Method <- "ART"
+p_values_df_art_no_weighting$Method <- "ART no weighting"
 p_values_df_ssrt$Method <- "SSRT"
 p_values_df_ssssrt$Method <- "SSSSRT"
 
-combined_p_values_df <- rbind(p_values_df_rt, p_values_df_ssrt, p_values_df_ssssrt, p_values_df_art)
+combined_p_values_df <- rbind(p_values_df_rt, p_values_df_ssrt, p_values_df_ssssrt, p_values_df_art, p_values_df_art_no_weighting)
 
 combined_p_values_long <- reshape2::melt(combined_p_values_df, id.vars = "Method")
 combined_p_values_long$Method <- factor(
   combined_p_values_long$Method,
-  levels = c("RT", "SSRT", "SSSSRT", "ART") 
+  levels = c("RT", "SSRT", "SSSSRT", "ART", "ART no weighting") 
 )
 
 par(mar = c(5, 5, 4, 5))
-group_spacing <- 5
-at_positions <- rep(1:Group.number, each = 4) * group_spacing + c(-1, 0, 1, 2) # each = number of methods
+group_spacing <- 6
+at_positions <- rep(1:Group.number, each = 5) * group_spacing + c(-1, 0, 1, 2, 3) # each = number of methods
 
-cols = c("#A3C1AD", "gold", "coral",  "#8C1515")
+cols = c("#A3C1AD", "gold", "coral",  "light blue", "#8C1515")
 boxplot(value ~ Method + variable, data = combined_p_values_long, 
         at = at_positions, col = cols, notch = F, xaxt = "n",
         ylab = "P-values", xlab = "", # Remove the x-axis label
@@ -259,7 +285,7 @@ boxplot(value ~ Method + variable, data = combined_p_values_long,
 axis(1, at = 1:Group.number * group_spacing, labels = paste("Group", 1:Group.number),
      cex.axis = 1.5)  
 
-legend("topright", legend = c("RT", "SSRT", "SSSSRT", "ART"), fill = cols, 
+legend("topright", legend = c("RT", "SSRT", "SSSSRT", "ART", "ART no weighting"), fill = cols, 
        cex = 0.8, 
        pt.cex = 2,  
        bg = "white",
@@ -279,7 +305,8 @@ data.frame("Nuisance estimation R2" = lapply(R2, mean),
 data.frame("RT" = round(colMeans(pval$RT[1:j,]),2),
            "SSRT" = round(colMeans(pval$SSRT[1:j,]),2),
            "SSSSRT" = round(colMeans(pval$SSSSRT[1:j,]),2),
-           "ART" = round(colMeans(pval$ART[1:j,]),2))
+           "ART" = round(colMeans(pval$ART[1:j,]),2),
+           "ART no weighting" = round(colMeans(pval$ART.no.weighting[1:j,]),2))
 
 
 # save data
@@ -287,8 +314,7 @@ record = list()
 record$pval = pval; record$R = R; record$R2 = R2; record$FWER = FWER
 record$inference.ATE = inference.ATE; record$inference.proportion = lapply(inference.proportion, function(x){x / (n / Group.number)})
 # saveRDS(record, file = paste(file.path(directory, setting), ".rds", sep = ""))
-
-
+# record2 = record
 
 
 

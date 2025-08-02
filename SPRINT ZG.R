@@ -219,16 +219,14 @@ record$pValue$DDRT = p.value.dd
 record$pValue$ART = p.value.active
 
 # FWER
-q = 0.2
-record$R$RT = sum((p.adjust(record$pValue$RT, method = "holm") <= q))
-record$R$SSRT = sum((p.adjust(record$pValue$SSRT[1,], method = "holm") <= q)) # use the first run
-record$R$DDRT = sum((p.adjust(record$pValue$DDRT, method = "holm") <= q))
-record$R$ART = sum((p.adjust(record$pValue$ART, method = "holm") <= q))
+q = 0.2 # 0.2
+record$R$RT = sum(closing(p_val = record$pValue$RT, q = q, global.null.test = "Fisher"))
+record$R$SSRT = sum(closing(p_val = record$pValue$SSRT[1,], q = q, global.null.test = "Fisher")) # use the first run
+record$R$DDRT = sum(closing(p_val = record$pValue$DDRT, q = q, global.null.test = "Fisher"))
+record$R$ART = sum(closing(p_val = record$pValue$ART, q = q, global.null.test = "Fisher"))
 
 print(record)
 
 
-# saveRDS
-# saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT0421.rds") # SPRINT.rds; SPRINT0421.rds
-# record = readRDS("~/Desktop/Research/Yao/HTE inference/code/Panning/April 2025/SPRINT.rds")
+# saveRDS(record, "~/Desktop/Research/Yao/HTE inference/code/Panning/July 2025/SPRINT.rds") # SPRINT.rds; SPRINT0421.rds
 

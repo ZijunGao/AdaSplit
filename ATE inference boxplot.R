@@ -23,7 +23,7 @@ settings = c("default",
 
 count = 1 # "default": 1; "larger sample size": 2
 setting = settings[count]
-record = readRDS(file.path(directory, "April 2025", paste(setting, ".rds", sep = "")))
+record = readRDS(file.path(directory, "July 2025", paste(setting, ".rds", sep = "")))
 
 inference_ate_ssrt <- as.data.frame(record$inference.ATE$SSRT)
 inference_ate_art <- as.data.frame(record$inference.ATE$ART)

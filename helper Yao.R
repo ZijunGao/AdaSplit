@@ -23,7 +23,7 @@ nuisance.tau.ss = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, tr
   beta = inv_XTWX %*% XTWR
   tau = cbind(1, X) %*% beta
   
-  Q = Posterior(train.index, tau, X, R, W, Ex,IW)
+  Q = Posterior(train.index, tau, X, R, W, Ex,IW, weighting = FALSE)
   beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
@@ -57,7 +57,7 @@ Posterior_fit = function(train.index, X, R, W, Ex, Q, A, marginalize = T, lambda
 }
 
 
-nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = TRUE, k= 20, p=0.05, robust = F, marginalize = T, lambda = 1, lambda.update.period = Inf, loss_threshold = NULL, initial.proportion = 0.05, ...){
+nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL, Group=NULL, proportion = NULL, groupwise=FALSE, weighting = TRUE, k= 10, p=0.1, robust = F, marginalize = T, lambda = 1, lambda.update.period = Inf, loss_threshold = NULL, initial.proportion = 0.05, ...){
   
   # Y is an n-dimensional outcome matrix
   # X is an n x d covariate matrix 
@@ -81,7 +81,6 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   A = knn.indices(X,Y,k)
   
   X = as.matrix(X) # turn data.frame to matrx
-  
 
   # Compute the residuals
   R = Y - mu
@@ -121,7 +120,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   #inv_XTWX_X = inv_XTWX %*% t(cbind(1, rbind(X,X)))
   
   # Compute Imputed OLS
-  Q = Posterior(train.index, tau, X, R, W, Ex,IW)
+  Q = Posterior(train.index, tau, X, R, W, Ex,IW, weighting)
   beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
   tau.imputed = cbind(1, X) %*% beta.imputed
   
@@ -130,14 +129,14 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
   
   if(robust){
     window_size <- 10
-    epoch.gap = 20
+    epoch.gap = 20 # 20
     if(is.null(loss_threshold)){loss_threshold <- 0.1}
-    lambda.update = 20
+    # lambda.update.period = 20
   }else{
     window_size <- 50
     epoch.gap = 1
     if(is.null(loss_threshold)){loss_threshold <- 0.01}
-    lambda.update = 20
+    # lambda.update.period = 20
   }
   
   
@@ -185,7 +184,7 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
       idx = which(Group[test.index] %in% Group.0)
     }
     
-    if(epoch %% 2 == 0){
+    if(epoch %% Inf == 0){
       # new = sample(test.index[idx], 1)
       new = intersect(order(diag(X %*% solve(t(X) %*% X) %*% solve(t(X) %*% X) %*% t(X)), decreasing = T), test.index[idx])[1]
 
@@ -206,19 +205,29 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
     if (epoch %% epoch.gap ==0){
       
-      X_ = cbind(1, X[train.index,])
-      R_ = (R/ (W-Ex))[train.index]
-      W_ = diag(c(((W-Ex)**2 * IW)[train.index]))
-      inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
-      XTWR = t(X_) %*% W_ %*% R_
-      beta = inv_XTWX %*% XTWR
-      tau = cbind(1, X) %*% beta
-    
+
       
-      Q = Posterior(train.index, tau, X, R, W, Ex, IW)
+      if (weighting){
+        
+        X_ = cbind(1, X[train.index,])
+        R_ = (R/ (W-Ex))[train.index]
+        W_ = diag(c(((W-Ex)**2 * IW)[train.index]))
+        inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
+        XTWR = t(X_) %*% W_ %*% R_
+        beta = inv_XTWX %*% XTWR
+        tau = cbind(1, X) %*% beta
+        
+        Q = Posterior(train.index, tau, X, R, W, Ex,IW, weighting)
+        beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
+        tau.imputed = cbind(1, X) %*% beta.imputed
+        
+      }
+      
+      Q = Posterior(train.index, tau.imputed, X, R, W, Ex, IW=rep(1,n),weighting=FALSE)
+      
       beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
       tau.imputed = cbind(1, X) %*% beta.imputed
-  
+      
       # Compute the estimator change due to the new data point
       loss = sum((tau.imputed[test.index]-tau.copy[test.index])**2)/sum((tau.copy-mean(tau.copy[test.index]))**2)
       #loss = sum((beta.imputed - beta.copy)**2)/sum(beta.copy**2)
@@ -292,22 +301,31 @@ nuisance.tau.active = function(Y= NULL, X = NULL, Ex = NULL, W = NULL, mu = NULL
     
     
     
-    X_ = cbind(1, X[train.index,])
-    R_ = (R/ (W-Ex))[train.index]
-    W_ = diag(c(((W-Ex)**2 * IW)[train.index]))
-    inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
-    XTWR = t(X_) %*% W_ %*% R_
-    beta = inv_XTWX %*% XTWR
-    tau = cbind(1, X) %*% beta
+
     
+    if (weighting){
+      
+      X_ = cbind(1, X[train.index,])
+      R_ = (R/ (W-Ex))[train.index]
+      W_ = diag(c(((W-Ex)**2 * IW)[train.index]))
+      inv_XTWX = solve(t(X_) %*% W_ %*% X_ + 10e-10*diag(rep(1.0,dim(X_)[2])))
+      XTWR = t(X_) %*% W_ %*% R_
+      beta = inv_XTWX %*% XTWR
+      tau = cbind(1, X) %*% beta
+      
+      Q = Posterior(train.index, tau, X, R, W, Ex,IW,weighting)
+      beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
+      tau.imputed = cbind(1, X) %*% beta.imputed
+      
+    }
     
-    Q = Posterior(train.index, tau, X, R, W, Ex,IW)
+    Q = Posterior(train.index, tau.imputed, X, R, W, Ex, IW = rep(1,n),weighting=FALSE)
     beta.imputed = Posterior_fit(train.index, X, R, W, Ex, Q, A, marginalize = marginalize, lambda = lambda)
     tau.imputed = cbind(1, X) %*% beta.imputed
   }
   cat("Data used for the nuisance in ART (%):", 100*round(length(train.index)/n,6),"\n")
   
-  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index, beta = beta.imputed, train.index.before.throw.away = train.index.before.throw.away, lambda.seq = lambda.seq)) 
+  return(result = list(mu0 = mu0.hat, mu1 = mu1.hat, tau = tau.imputed, train.index = train.index, beta = beta.imputed, lambda.seq = lambda.seq)) 
 }
 
 
@@ -498,7 +516,7 @@ xr_update = function(xtwr, w, r, x, sign){
 
 
 
-Posterior = function(train.index, tau, X, R, W, Ex, IW){
+Posterior = function(train.index, tau, X, R, W, Ex, IW,weighting){
   
   # generate leave-one-out residual
   n = length(Ex) 
@@ -511,9 +529,15 @@ Posterior = function(train.index, tau, X, R, W, Ex, IW){
   #  res[i] = R[train.index[i]] - (W[train.index[i]]-Ex[train.index[i]])*tau[train.index[i]] 
   #}
   
+  if (weighting){
+    size = n
+  }else{
+    size = length((train.index))
+  }
+  
   res.y = R[train.index] -  (W[train.index]-Ex[train.index])*tau[train.index]
   res.mean = 0 #sum(res.y*IW[train.index])/n
-  res.std =  sqrt(sum((res.y-res.mean)**2*IW[train.index])/n)
+  res.std =  sqrt(sum((res.y-res.mean)**2*IW[train.index])/size)
   
 
   z.1 = pmax(pmin((R - (1-Ex)*tau - res.mean)/res.std,4),-4)

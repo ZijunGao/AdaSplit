@@ -18,7 +18,7 @@ settings <- c("default",
               "no marginalization larger noise")
 directory = "~/Desktop/Research/Yao/HTE inference/code/Panning" 
 
-record_default <- readRDS(file.path(directory, "April 2025", paste(settings[1], ".rds", sep = "")))
+record_default <- readRDS(file.path(directory, "July 2025", paste(settings[1], ".rds", sep = "")))
 inference_art_default <- as.data.frame(record_default$inference.proportion$ART)
 Group.number <- ncol(inference_art_default)
 colnames(inference_art_default) <- paste0("G", 1:Group.number)
@@ -50,7 +50,7 @@ summary_df <- combined_long %>%
   )
 
 # Plot bar chart with ±1 SD error bars
-pdf(paste0(directory, "/inference_proportion_", setting, "_no_throw_away.pdf"), width = 3, height = 3)
+# pdf(paste0(directory, "/inference_proportion_", setting, "_no_throw_away.pdf"), width = 3, height = 3)
 # pdf(paste0(directory, "/inference_proportion_", setting, ".pdf"), width = 3, height = 3)
 ggplot(summary_df, aes(x = variable, y = mean, fill = Method)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.6), width = 0.5, color = "black") +
@@ -80,5 +80,5 @@ ggplot(summary_df, aes(x = variable, y = mean, fill = Method)) +
     panel.grid.minor.x = element_blank(),
     panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
   )
-dev.off()
+# dev.off()
 

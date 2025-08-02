@@ -17,9 +17,9 @@ settings = c("default",
              "no marginalization larger sample size",
              "no marginalization larger noise")
   # count = 0
-  count = count + 1
+  # count = count + 1
   setting = settings[count]
-  record = readRDS(file.path(directory, "April 2025", paste(setting, ".rds", sep = "")))
+  record = readRDS(file.path(directory, "July 2025", paste(setting, ".rds", sep = "")))
   p_values_df_rt <- as.data.frame(record$pval$RT)
   p_values_df_ssrt <- as.data.frame(record$pval$SSRT)
   p_values_df_art <- as.data.frame(record$pval$ART)
@@ -41,7 +41,7 @@ settings = c("default",
   )
   combined_p_values_long$variable <- factor(combined_p_values_long$variable, levels = paste("G", 1:Group.number, sep = ""))
   
-  pdf(paste0(directory, "/Comparison_setting_", setting, ".pdf"), width = 5.5, height = 3)
+  # pdf(paste0(directory, "/Comparison_setting_", setting, ".pdf"), width = 5.5, height = 3)
   ggplot(combined_p_values_long, aes(x = variable, y = value, fill = Method)) +
     geom_boxplot(
       position = position_dodge(width = 0.75), 
@@ -69,7 +69,7 @@ settings = c("default",
       panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
     )
   
-  dev.off()
+  # dev.off()
   count
 
 
